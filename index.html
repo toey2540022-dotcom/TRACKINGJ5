@@ -3,76 +3,51 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Omoda & Jaecoo Tracker</title>
+  <title>O&J Tracker</title>
   
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
-  
-  <!-- SheetJS (Excel) โหลดแบบ defer เพื่อไม่ให้บล็อกการแสดงผลหน้าเว็บ -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+  <!-- SheetJS สำหรับอ่านไฟล์ Excel -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-  <style>
-    /* ซ่อนลูกศรเริ่มต้นของ details/summary */
-    details > summary { list-style: none; }
-    details > summary::-webkit-details-marker { display: none; }
-    
-    /* ไอคอนหมุนเมื่อ details เปิด */
-    details[open] > summary .chevron-icon { transform: rotate(90deg); }
-    .chevron-icon { transition: transform 0.2s ease-in-out; }
+  <!-- Import Maps สำหรับ ES Modules -->
+  <script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+        "lucide-react": "https://esm.sh/lucide-react@0.292.0",
+        "firebase/app": "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js",
+        "firebase/firestore": "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"
+      }
+    }
+  </script>
 
-    /* Toast Animation */
-    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-    @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
-    .toast-enter { animation: slideIn 0.3s ease-out forwards; }
-    .toast-exit { animation: fadeOut 0.3s ease-out forwards; }
-  </style>
+  <!-- Babel Standalone สำหรับแปลง JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
-<body class="bg-gray-100 font-sans min-h-screen">
+<body class="bg-gray-100 font-sans antialiased">
+  <div id="root"></div>
 
-  <!-- Header -->
-  <header class="bg-slate-900 text-white sticky top-0 z-40 shadow-md">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex justify-between items-center h-16">
-        <div class="flex items-center space-x-2">
-          <i data-lucide="car" class="w-8 h-8 text-blue-400"></i>
-          <span class="font-bold text-xl tracking-tight">O&J Tracker</span>
-        </div>
-        <div class="flex items-center text-xs text-gray-400" id="connection-status">
-           <div class="w-2 h-2 rounded-full mr-2 bg-red-500 animate-pulse" id="status-dot"></div>
-           <span id="status-text">Connecting...</span>
-        </div>
-      </div>
-    </div>
-  </header>
+  <!-- โค้ด React ทั้งหมดอยู่ที่นี่ -->
+  <script type="text/babel" data-type="module">
+    import React, { useState, useMemo, useEffect, useRef } from 'react';
+    import { createRoot } from 'react-dom/client';
+    import { 
+      BarChart3, Car, Users, CheckCircle, Package, AlertTriangle, Plus, MapPin, 
+      Store, ChevronDown, ChevronRight, Map, Phone, Database, Upload, 
+      FileSpreadsheet, Lock, LogOut, Edit2, Trash2, X
+    } from 'lucide-react';
 
-  <!-- Tabs Navigation -->
-  <div class="bg-white border-b border-gray-200 sticky top-16 z-30">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <nav class="flex space-x-6 overflow-x-auto" id="tabs-container">
-        <!-- Tabs generated via JS -->
-      </nav>
-    </div>
-  </div>
+    // --- Firebase SDK Imports ---
+    import { initializeApp } from 'firebase/app';
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
+    import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 
-  <!-- Main Content -->
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" id="app-content">
-    <!-- Content injected via JS -->
-  </main>
-
-  <!-- Toast Notifications Container -->
-  <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"></div>
-
-  <!-- Firebase & Application Logic -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    // เปลี่ยนจาก Firestore เป็น Realtime Database
-    import { getDatabase, ref, set, push, remove, update, onValue } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
-
-    // --- Configuration ---
+    // --- Firebase Configuration ---
     const userFirebaseConfig = {
       apiKey: "AIzaSyBS8XAd5IGDmZmz2n-N01ag7k5Yo0m5fQ0",
       authDomain: "jaecooj5-b986e.firebaseapp.com",
@@ -84,1049 +59,1204 @@
       measurementId: "G-4XM56N6MH4"
     };
 
-    const firebaseConfigStr = typeof __firebase_config !== 'undefined' ? __firebase_config : JSON.stringify(userFirebaseConfig);
-    const firebaseConfig = JSON.parse(firebaseConfigStr);
+    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : userFirebaseConfig;
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
-    const db = getDatabase(app); // ใช้ Realtime DB
-    
-    const rawAppId = typeof __app_id !== 'undefined' ? __app_id : 'omoda-jaecoo-tracker';
-    // ทำความสะอาดรหัสโปรเจกต์ให้เหลือแค่ตัวอักษรและตัวเลข ป้องกัน Error จากอักขระพิเศษใน Firebase อย่างเด็ดขาด
-    const appId = String(rawAppId).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const db = getFirestore(app);
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'omoda-jaecoo-tracker';
 
-    const CAR_COLORS = ["White (ขาว)", "Black (ดำ)", "Grey (เทา)", "Green (เขียว)", "Silver (เงิน)", "Blue (น้ำเงิน)"];
-    const CAR_MODELS = ["OMODA C5 EV", "JAECOO 6", "JAECOO J5", "JAECOO J6", "JAECOO 7 PHEV", "JAECOO 8 PHEV"];
+    const CAR_COLORS = ["White (ขาว)", "Black (ดำ)", "Grey (เทา)", "Green (เขียว)", "Silver (เงิน)"];
+    const CAR_MODELS = ["OMODA C5 EV", "JAECOO 6", "JAECOO 7 PHEV", "JAECOO 8 PHEV"];
 
-    // --- Global State ---
-    const state = {
-      tab: 'dashboard',
-      user: null,
-      isAdmin: false,
-      dealersData: [],
-      inventory: [],
-      bookings: [],
-      selectedMetric: null,
-      // เก็บค่าฟอร์มไว้ทั้งหมดเพื่อป้องกันข้อมูลหายตอนเรนเดอร์ใหม่
-      dealerForm: { province: '', dealer: '', model: '', color: '', qty: '' },
-      buyerForm: { customerName: '', province: '', dealer: '', model: '', color: '' },
-      editingInventoryId: null,
-      editQtyValue: '',
-      editingBookingId: null
+    // --- Custom Searchable Select Component ---
+    const SearchableSelect = ({ options, value, onChange, placeholder, disabled, icon: Icon }) => {
+      const [isOpen, setIsOpen] = useState(false);
+      const [search, setSearch] = useState(value || '');
+      const wrapperRef = useRef(null);
+
+      useEffect(() => {
+        setSearch(value || '');
+      }, [value]);
+
+      useEffect(() => {
+        function handleClickOutside(event) {
+          if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+            setIsOpen(false);
+            if (value) setSearch(value);
+            else setSearch('');
+          }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+      }, [value]);
+
+      const filteredOptions = options.filter(opt =>
+        opt.toLowerCase().includes(search.toLowerCase())
+      );
+
+      return (
+        <div ref={wrapperRef} className="relative w-full">
+          {Icon && <Icon className="absolute left-3 top-3 w-5 h-5 text-gray-400 z-10" />}
+          <input
+            type="text"
+            className={`w-full ${Icon ? 'pl-10' : 'pl-3'} pr-10 p-2.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:bg-gray-100`}
+            placeholder={placeholder}
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setIsOpen(true);
+              if (value) onChange(''); 
+            }}
+            onFocus={() => setIsOpen(true)}
+            disabled={disabled}
+          />
+          <ChevronDown className="absolute right-3 top-3 w-5 h-5 text-gray-400 pointer-events-none" />
+          
+          {isOpen && !disabled && (
+            <ul className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+              {filteredOptions.length > 0 ? (
+                filteredOptions.map((opt, index) => (
+                  <li
+                    key={index}
+                    className="px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm text-gray-700 border-b border-gray-50 last:border-none"
+                    onClick={() => {
+                      setSearch(opt);
+                      onChange(opt);
+                      setIsOpen(false);
+                    }}
+                  >
+                    {opt}
+                  </li>
+                ))
+              ) : (
+                <li className="px-4 py-2 text-sm text-gray-500 text-center">ไม่พบข้อมูล</li>
+              )}
+            </ul>
+          )}
+        </div>
+      );
     };
 
-    // --- Toast Notification System ---
-    window.showToast = function(message, type = 'info') {
-      const container = document.getElementById('toast-container');
-      const toast = document.createElement('div');
+    // Component สำหรับแสดงข้อมูลสาขา
+    const DealerInfoCard = ({ dealerData }) => {
+      if (!dealerData) return null;
       
-      let bgColor = 'bg-blue-600';
-      let icon = 'info';
-      if (type === 'success') { bgColor = 'bg-emerald-600'; icon = 'check-circle'; }
-      if (type === 'error') { bgColor = 'bg-red-600'; icon = 'alert-triangle'; }
-      if (type === 'warning') { bgColor = 'bg-orange-500'; icon = 'alert-circle'; }
-
-      toast.className = `toast-enter flex items-center p-4 text-white rounded-lg shadow-lg ${bgColor}`;
-      toast.innerHTML = `<i data-lucide="${icon}" class="w-5 h-5 mr-3"></i> <span>${message}</span>`;
-      
-      container.appendChild(toast);
-      lucide.createIcons({ root: toast });
-
-      setTimeout(() => {
-        toast.classList.replace('toast-enter', 'toast-exit');
-        setTimeout(() => toast.remove(), 300);
-      }, 3000);
-    };
-
-    // --- Firebase Auth & Subscriptions ---
-    async function initFirebase() {
-      try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
-      } catch (error) {
-        console.error("Auth Error:", error);
-        if(error.code === 'auth/operation-not-allowed') {
-            showToast("เชื่อมต่อล้มเหลว: โปรดเปิดใช้งาน 'Anonymous Sign-in' ใน Firebase Console", "error");
-        } else {
-            showToast("การเชื่อมต่อล้มเหลว: " + error.message, "error");
-        }
-        
-        const text = document.getElementById('status-text');
-        const dot = document.getElementById('status-dot');
-        if(text && dot) {
-            text.innerText = 'Connection Failed';
-            dot.className = 'w-2 h-2 rounded-full mr-2 bg-red-600';
-            dot.classList.remove('animate-pulse');
-        }
-      }
-    }
-
-    let unsubscribes = [];
-    onAuthStateChanged(auth, (user) => {
-      state.user = user;
-      updateConnectionStatus();
-      
-      // Cleanup previous subscriptions
-      unsubscribes.forEach(unsub => unsub());
-      unsubscribes = [];
-
-      if (user) {
-        // Data References in Realtime Database
-        const dealersRef = ref(db, `artifacts/${appId}/public/data/settings/dealersList`);
-        const inventoryRef = ref(db, `artifacts/${appId}/public/data/inventory`);
-        const bookingsRef = ref(db, `artifacts/${appId}/public/data/bookings`);
-
-        const unsubDealers = onValue(dealersRef, (snap) => {
-          state.dealersData = snap.exists() ? (snap.val().list || []) : [];
-          renderApp(); // รีเรนเดอร์เมื่อข้อมูลอัปเดต
-        }, err => console.error(err));
-
-        const unsubInventory = onValue(inventoryRef, (snap) => {
-          const data = [];
-          if (snap.exists()) {
-            snap.forEach((child) => {
-              data.push({ id: child.key, ...child.val() });
-            });
-          }
-          state.inventory = data;
-          renderApp();
-        }, err => console.error(err));
-
-        const unsubBookings = onValue(bookingsRef, (snap) => {
-          const data = [];
-          if (snap.exists()) {
-            snap.forEach((child) => {
-              data.push({ id: child.key, ...child.val() });
-            });
-          }
-          state.bookings = data;
-          renderApp();
-        }, err => console.error(err));
-        
-        unsubscribes.push(unsubDealers, unsubInventory, unsubBookings);
-      } else {
-        renderApp();
-      }
-    });
-
-    function updateConnectionStatus() {
-      const dot = document.getElementById('status-dot');
-      const text = document.getElementById('status-text');
-      if (state.user) {
-        dot.className = 'w-2 h-2 rounded-full mr-2 bg-green-500';
-        text.innerText = 'Cloud Connected';
-      } else {
-        dot.className = 'w-2 h-2 rounded-full mr-2 bg-red-500 animate-pulse';
-        text.innerText = 'Connecting...';
-      }
-    }
-
-    initFirebase();
-
-    // --- Computed Stats ---
-    function getCalculatedStats() {
-      let totalCars = 0, totalBooked = 0, totalDelivered = 0, totalShortage = 0;
-      const dealerMap = {};
-
-      state.dealersData.forEach(d => {
-        dealerMap[d.name] = {
-          region: d.region, province: d.province, dealer: d.name,
-          totalCars: 0, totalBooked: 0, totalDelivered: 0, totalShortage: 0,
-          demandByColor: {}, supplyByColor: {}
-        };
-      });
-
-      state.inventory.forEach(item => {
-        if (!dealerMap[item.dealer]) {
-          dealerMap[item.dealer] = { region: 'อื่นๆ', province: 'อื่นๆ', dealer: item.dealer, totalCars: 0, totalBooked: 0, totalDelivered: 0, totalShortage: 0, demandByColor: {}, supplyByColor: {} };
-        }
-        dealerMap[item.dealer].totalCars += item.qty;
-        const key = `${item.model}-${item.color}`;
-        dealerMap[item.dealer].supplyByColor[key] = (dealerMap[item.dealer].supplyByColor[key] || 0) + item.qty;
-        totalCars += item.qty;
-      });
-
-      state.bookings.forEach(b => {
-        if (!dealerMap[b.dealer]) {
-          dealerMap[b.dealer] = { region: 'อื่นๆ', province: 'อื่นๆ', dealer: b.dealer, totalCars: 0, totalBooked: 0, totalDelivered: 0, totalShortage: 0, demandByColor: {}, supplyByColor: {} };
-        }
-        const key = `${b.model}-${b.color}`;
-        if (b.status === 'booked') {
-          dealerMap[b.dealer].totalBooked += 1;
-          dealerMap[b.dealer].demandByColor[key] = (dealerMap[b.dealer].demandByColor[key] || 0) + 1;
-          totalBooked += 1;
-        }
-        if (b.status === 'delivered') {
-          dealerMap[b.dealer].totalDelivered += 1;
-          dealerMap[b.dealer].supplyByColor[key] = Math.max(0, (dealerMap[b.dealer].supplyByColor[key] || 0) - 1);
-          totalDelivered += 1;
-        }
-      });
-
-      Object.values(dealerMap).forEach(d => {
-        Object.keys(d.demandByColor).forEach(key => {
-          const demand = d.demandByColor[key];
-          const supply = d.supplyByColor[key] || 0;
-          if (demand > supply) {
-            const shortageQty = demand - supply;
-            d.totalShortage += shortageQty;
-            totalShortage += shortageQty;
-          }
-        });
-      });
-
-      const grouped = {};
-      Object.values(dealerMap).forEach(d => {
-        if (!grouped[d.region]) grouped[d.region] = {};
-        if (!grouped[d.region][d.province]) grouped[d.region][d.province] = [];
-        grouped[d.region][d.province].push(d);
-      });
-
-      return { totalCars, totalBooked, totalDelivered, totalShortage, grouped };
-    }
-
-    function getProvinces() {
-      return [...new Set(state.dealersData.map(d => d.province))].sort();
-    }
-
-    function getDealersByProvince(province) {
-      if (!province) return [];
-      return state.dealersData.filter(d => d.province === province).map(d => d.name);
-    }
-
-    function getDealerInfo(dealerName, province) {
-      return state.dealersData.find(d => d.name === dealerName && d.province === province);
-    }
-
-    // --- App Actions (Global) ---
-    window.appActions = {
-      switchTab: (tabId) => {
-        state.tab = tabId;
-        renderApp();
-      },
-      selectMetric: (metric) => {
-        state.selectedMetric = state.selectedMetric === metric ? null : metric;
-        renderApp();
-      },
-      dealerProvinceChange: (val) => {
-        // บันทึกค่าอื่นๆ ที่กรอกไว้เพื่อไม่ให้หายตอนรีเฟรชหน้าจอ
-        state.dealerForm.model = document.querySelector('select[name="model"]')?.value || '';
-        state.dealerForm.color = document.querySelector('select[name="color"]')?.value || '';
-        state.dealerForm.qty = document.querySelector('input[name="qty"]')?.value || '';
-        
-        state.dealerForm.province = val;
-        state.dealerForm.dealer = ''; // Reset dealer
-        renderApp();
-      },
-      dealerNameChange: (val) => {
-        state.dealerForm.model = document.querySelector('select[name="model"]')?.value || '';
-        state.dealerForm.color = document.querySelector('select[name="color"]')?.value || '';
-        state.dealerForm.qty = document.querySelector('input[name="qty"]')?.value || '';
-        
-        state.dealerForm.dealer = val;
-        renderApp();
-      },
-      buyerProvinceChange: (val) => {
-        state.buyerForm.customerName = document.querySelector('input[name="customerName"]')?.value || '';
-        state.buyerForm.model = document.querySelector('select[name="model"]')?.value || '';
-        state.buyerForm.color = document.querySelector('select[name="color"]')?.value || '';
-        
-        state.buyerForm.province = val;
-        state.buyerForm.dealer = ''; // Reset dealer
-        renderApp();
-      },
-      buyerNameChange: (val) => {
-        state.buyerForm.customerName = document.querySelector('input[name="customerName"]')?.value || '';
-        state.buyerForm.model = document.querySelector('select[name="model"]')?.value || '';
-        state.buyerForm.color = document.querySelector('select[name="color"]')?.value || '';
-        
-        state.buyerForm.dealer = val;
-        renderApp();
-      },
-      adminLogin: (e) => {
-        e.preventDefault();
-        const fd = new FormData(e.target);
-        if (fd.get('username') === 'admin888' && fd.get('password') === '999999999') {
-          state.isAdmin = true;
-          renderApp();
-          showToast('เข้าสู่ระบบสำเร็จ', 'success');
-        } else {
-          showToast('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง', 'error');
-        }
-      },
-      adminLogout: () => {
-        state.isAdmin = false;
-        renderApp();
-      },
-      receiveCar: async (id) => {
-        if (!state.user) return showToast("ไม่ได้เชื่อมต่อฐานข้อมูล", "error");
-        try {
-          const bookingRef = ref(db, `artifacts/${appId}/public/data/bookings/${id}`);
-          await update(bookingRef, { status: 'delivered' });
-          showToast('ยืนยันการรับรถสำเร็จ', 'success');
-        } catch (error) {
-          showToast("เกิดข้อผิดพลาด: " + error.message, "error");
-        }
-      },
-      submitDealerForm: async (e) => {
-        e.preventDefault();
-        if (!state.user) return showToast("รอการเชื่อมต่อฐานข้อมูลสักครู่", "warning");
-        
-        const fd = new FormData(e.target);
-        const province = fd.get('province');
-        const dealer = fd.get('dealer');
-        const model = fd.get('model');
-        const color = fd.get('color');
-        const qty = parseInt(fd.get('qty'), 10);
-
-        if (!dealer || !model || !color || qty <= 0) return showToast("กรุณากรอกข้อมูลให้ครบถ้วนและถูกต้อง", "warning");
-        
-        // Validate from DB
-        const isValidDealer = state.dealersData.some(d => d.province === province && d.name === dealer);
-        if (!isValidDealer) return showToast("ไม่พบสาขานี้ในระบบ โปรดเลือกจากรายการ", "error");
-
-        try {
-          const existing = state.inventory.find(item => item.dealer === dealer && item.model === model && item.color === color);
-          if (existing) {
-            const itemRef = ref(db, `artifacts/${appId}/public/data/inventory/${existing.id}`);
-            await update(itemRef, { qty: existing.qty + qty });
-          } else {
-            const invListRef = ref(db, `artifacts/${appId}/public/data/inventory`);
-            await push(invListRef, { dealer, model, color, qty });
-          }
-          showToast('อัปเดตสต็อกสำเร็จ!', 'success');
-          
-          // ล้างข้อมูลเพื่อความสะดวกในการเพิ่มสีต่อไป
-          state.dealerForm.model = '';
-          state.dealerForm.color = '';
-          state.dealerForm.qty = '';
-          e.target.reset();
-          renderApp();
-        } catch (error) {
-          showToast("เกิดข้อผิดพลาด: " + error.message, "error");
-        }
-      },
-      startEditInventory: (id, currentQty) => {
-        state.editingInventoryId = id;
-        state.editQtyValue = currentQty;
-        renderApp();
-      },
-      cancelEditInventory: () => {
-        state.editingInventoryId = null;
-        renderApp();
-      },
-      saveEditInventory: async (id) => {
-        if (!state.user) return;
-        const newQty = parseInt(document.getElementById(`edit-qty-${id}`).value, 10);
-        if (isNaN(newQty) || newQty < 0) return showToast("จำนวนไม่ถูกต้อง", "warning");
-
-        try {
-          const itemRef = ref(db, `artifacts/${appId}/public/data/inventory/${id}`);
-          if (newQty === 0) {
-            await remove(itemRef);
-          } else {
-            await update(itemRef, { qty: newQty });
-          }
-          state.editingInventoryId = null;
-          showToast('แก้ไขข้อมูลสำเร็จ', 'success');
-        } catch (error) {
-          showToast("เกิดข้อผิดพลาด: " + error.message, "error");
-        }
-      },
-      deleteInventory: async (id) => {
-        if (!state.user) return;
-        if (confirm('คุณแน่ใจหรือไม่ว่าต้องการลบรายการสต็อกนี้?')) {
-          try {
-            const itemRef = ref(db, `artifacts/${appId}/public/data/inventory/${id}`);
-            await remove(itemRef);
-            showToast('ลบรายการสำเร็จ', 'success');
-          } catch (error) {
-            showToast("เกิดข้อผิดพลาด: " + error.message, "error");
-          }
-        }
-      },
-      startEditBooking: (id) => {
-        state.editingBookingId = id;
-        renderApp();
-      },
-      cancelEditBooking: () => {
-        state.editingBookingId = null;
-        renderApp();
-      },
-      saveEditBooking: async (id) => {
-        if (!state.user) return;
-        const newName = document.getElementById(`edit-b-name-${id}`).value;
-        const newModel = document.getElementById(`edit-b-model-${id}`).value;
-        const newColor = document.getElementById(`edit-b-color-${id}`).value;
-
-        if (!newName || !newModel || !newColor) return showToast("กรุณากรอกข้อมูลให้ครบถ้วน", "warning");
-
-        try {
-          const bookingRef = ref(db, `artifacts/${appId}/public/data/bookings/${id}`);
-          await update(bookingRef, { customerName: newName, model: newModel, color: newColor });
-          state.editingBookingId = null;
-          showToast('แก้ไขข้อมูลการจองสำเร็จ', 'success');
-        } catch (error) {
-          showToast("เกิดข้อผิดพลาด: " + error.message, "error");
-        }
-      },
-      deleteBooking: async (id) => {
-        if (!state.user) return;
-        if (confirm('คุณแน่ใจหรือไม่ว่าต้องการยกเลิกการจองรายการนี้?')) {
-          try {
-            const bookingRef = ref(db, `artifacts/${appId}/public/data/bookings/${id}`);
-            await remove(bookingRef);
-            showToast('ยกเลิกการจองสำเร็จ', 'success');
-          } catch (error) {
-            showToast("เกิดข้อผิดพลาด: " + error.message, "error");
-          }
-        }
-      },
-      submitBuyerForm: async (e) => {
-        e.preventDefault();
-        if (!state.user) return showToast("รอการเชื่อมต่อฐานข้อมูลสักครู่", "warning");
-        
-        const fd = new FormData(e.target);
-        const customerName = fd.get('customerName');
-        const province = fd.get('province');
-        const dealer = fd.get('dealer');
-        const model = fd.get('model');
-        const color = fd.get('color');
-
-        if (!customerName || !dealer || !model || !color) return showToast("กรุณากรอกข้อมูลให้ครบถ้วน", "warning");
-
-        const isValidDealer = state.dealersData.some(d => d.province === province && d.name === dealer);
-        if (!isValidDealer) return showToast("ไม่พบสาขานี้ในระบบ โปรดเลือกจากรายการ", "error");
-
-        try {
-          const bookingsRef = ref(db, `artifacts/${appId}/public/data/bookings`);
-          await push(bookingsRef, {
-            customerName, province, dealer, model, color,
-            status: 'booked', createdAt: Date.now()
-          });
-          
-          showToast('บันทึกการจองสำเร็จ!', 'success');
-          
-          // ล้างข้อมูลเพื่อพร้อมรับคิวใหม่
-          state.buyerForm.customerName = '';
-          state.buyerForm.dealer = '';
-          state.buyerForm.model = '';
-          state.buyerForm.color = '';
-          e.target.reset();
-          renderApp();
-        } catch (error) {
-          showToast("เกิดข้อผิดพลาด: " + error.message, "error");
-        }
-      },
-      uploadExcel: (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        if (!window.XLSX) {
-          return showToast('ระบบกำลังโหลดโปรแกรมอ่านไฟล์ Excel กรุณารอสักครู่', 'warning');
-        }
-        if (!state.user) {
-          return showToast('กรุณารอระบบเชื่อมต่อฐานข้อมูลสักครู่...', 'warning');
-        }
-
-        const reader = new FileReader();
-        reader.onload = async (event) => {
-          try {
-            const data = new Uint8Array(event.target.result);
-            const workbook = window.XLSX.read(data, { type: 'array' });
-            const targetSheetName = workbook.SheetNames.find(name => name.includes('รายชื่อ')) || workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[targetSheetName];
-            const jsonData = window.XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-            
-            const newData = [];
-            for (let i = 1; i < jsonData.length; i++) {
-              const row = jsonData[i];
-              if (!row || row.length === 0) continue;
-              
-              const region = row[0] ? String(row[0]).trim() : '-';
-              const name = row[1] ? String(row[1]).trim() : '-';
-              const province = row[2] ? String(row[2]).trim() : '-';
-              const address = row[3] ? String(row[3]).trim() : '-';
-              const phone = row[4] ? String(row[4]).trim() : '-';
-
-              if (name !== '-' && province !== '-' && name !== 'ชื่อโชว์รูม/ศูนย์บริการ') {
-                newData.push({ region, name, province, address, phone });
-              }
-            }
-
-            if (newData.length > 0) {
-              const dealersDocRef = ref(db, `artifacts/${appId}/public/data/settings/dealersList`);
-              await set(dealersDocRef, { list: newData });
-              showToast(`อัปโหลดสำเร็จทั้งหมด ${newData.length} สาขา!`, 'success');
-            } else {
-              showToast('ไม่พบข้อมูลสาขา หรือรูปแบบคอลัมน์ไม่ถูกต้อง', 'error');
-            }
-          } catch (error) {
-            console.error(error);
-            showToast('เกิดข้อผิดพลาดในการอ่านไฟล์', 'error');
-          }
-        };
-        reader.readAsArrayBuffer(file);
-      }
-    };
-
-
-    // --- Render Functions ---
-    function renderApp() {
-      renderTabs();
-      
-      const content = document.getElementById('app-content');
-      if (state.tab === 'dashboard') content.innerHTML = getDashboardHTML();
-      else if (state.tab === 'dealer') content.innerHTML = getDealerHTML();
-      else if (state.tab === 'buyer') content.innerHTML = getBuyerHTML();
-      else if (state.tab === 'database') content.innerHTML = getDatabaseHTML();
-
-      lucide.createIcons();
-    }
-
-    function renderTabs() {
-      const tabs = [
-        { id: 'dashboard', label: 'แดชบอร์ดสรุปผล', icon: 'bar-chart-3', color: 'blue' },
-        { id: 'dealer', label: 'ดีลเลอร์ (อัปเดตสต็อก)', icon: 'store', color: 'blue' },
-        { id: 'buyer', label: 'ลูกค้า (จอง/รับรถ)', icon: 'users', color: 'orange' },
-        { id: 'database', label: 'ตั้งค่าฐานข้อมูลสาขา', icon: 'database', color: 'emerald' }
-      ];
-
-      const html = tabs.map(t => {
-        const isActive = state.tab === t.id;
-        const colorClass = isActive ? `border-${t.color}-500 text-${t.color}-600` : `border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300`;
-        return `
-          <button onclick="appActions.switchTab('${t.id}')" 
-            class="${colorClass} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center transition-colors">
-            <i data-lucide="${t.icon}" class="w-5 h-5 mr-2"></i> ${t.label}
-          </button>
-        `;
-      }).join('');
-
-      document.getElementById('tabs-container').innerHTML = html;
-    }
-
-    // --- Sub-views ---
-    function getDealerInfoCardHTML(dealerInfo) {
-      if (!dealerInfo) return '';
-      return `
-        <div class="mt-3 p-4 bg-blue-50 border border-blue-100 rounded-lg text-sm">
-          <div class="flex items-start mb-2">
-            <i data-lucide="map" class="w-4 h-4 text-blue-500 mr-2 mt-0.5 flex-shrink-0"></i>
-            <span class="text-gray-700"><strong>ที่อยู่:</strong> ${dealerInfo.address}</span>
+      return (
+        <div className="mt-3 p-4 bg-blue-50 border border-blue-100 rounded-lg text-sm">
+          <div className="flex items-start mb-2">
+            <Map className="w-4 h-4 text-blue-500 mr-2 mt-0.5 flex-shrink-0" />
+            <span className="text-gray-700"><strong>ที่อยู่:</strong> {dealerData.address}</span>
           </div>
-          <div class="flex items-center">
-            <i data-lucide="phone" class="w-4 h-4 text-blue-500 mr-2 flex-shrink-0"></i>
-            <span class="text-gray-700"><strong>เบอร์ติดต่อ:</strong> ${dealerInfo.phone}</span>
+          <div className="flex items-center">
+            <Phone className="w-4 h-4 text-blue-500 mr-2 flex-shrink-0" />
+            <span className="text-gray-700"><strong>เบอร์ติดต่อ:</strong> {dealerData.phone}</span>
           </div>
-          <div class="mt-2 text-xs text-blue-600 font-medium bg-blue-100 px-2 py-1 rounded inline-block">
-            ภูมิภาค: ${dealerInfo.region}
+          <div className="mt-2 text-xs text-blue-600 font-medium bg-blue-100 px-2 py-1 rounded inline-block">
+            ภูมิภาค: {dealerData.region}
           </div>
         </div>
-      `;
-    }
+      );
+    };
 
-    function getDatalistHTML(id, options) {
-      return `<datalist id="${id}">${options.map(opt => `<option value="${opt}"></option>`).join('')}</datalist>`;
-    }
+    export default function App() {
+      const [activeTab, setActiveTab] = useState('dashboard');
 
-    function getDashboardHTML() {
-      const stats = getCalculatedStats();
-      
-      const statCard = (title, val, icon, metricKey, bg, text, ring) => {
-        const isActive = state.selectedMetric === metricKey;
-        const baseClass = isActive ? `ring-2 ring-offset-2 ${ring} border-transparent bg-slate-50` : 'border-gray-100 hover:border-gray-300 hover:bg-gray-50';
-        const valClass = isActive ? text : 'text-gray-800';
-        return `
-          <button onclick="appActions.selectMetric('${metricKey}')" class="w-full text-left bg-white p-6 rounded-xl shadow-sm border transition-all duration-200 flex items-center space-x-4 ${baseClass}">
-            <div class="p-3 ${bg} ${text} rounded-lg"><i data-lucide="${icon}" class="w-8 h-8"></i></div>
-            <div>
-              <p class="text-sm text-gray-500 font-medium">${title}</p>
-              <p class="text-2xl font-bold ${valClass}">${val} <span class="text-sm font-normal text-gray-500">คัน</span></p>
-            </div>
-          </button>
-        `;
+      // --- States ---
+      const [dealersData, setDealersData] = useState([]);
+      const [inventory, setInventory] = useState([]);
+      const [bookings, setBookings] = useState([]);
+      const [isAdmin, setIsAdmin] = useState(false);
+      const [user, setUser] = useState(null);
+
+      // --- Dialog State (เพื่อทดแทนการใช้ alert() และ confirm() แบบดั้งเดิม) ---
+      const [dialog, setDialog] = useState({ isOpen: false, message: '', isConfirm: false, onConfirm: null });
+
+      const showAlert = (message) => {
+        setDialog({ isOpen: true, message, isConfirm: false, onConfirm: null });
       };
 
-      let bottomView = '';
-      if (state.selectedMetric) {
-        // Drill-down View
-        const configs = {
-          totalCars: { label: "รถเข้ามาทั้งหมด", unit: "คัน", color: "text-blue-600" },
-          totalBooked: { label: "จองแล้ว (รอรับรถ)", unit: "คัน", color: "text-orange-600" },
-          totalShortage: { label: "สถานะรถขาด", unit: "คัน", color: "text-red-600" },
-          totalDelivered: { label: "รับรถไปแล้ว", unit: "คัน", color: "text-green-600" }
-        };
-        const cfg = configs[state.selectedMetric];
-        
-        let regionsHTML = '';
-        Object.keys(stats.grouped).forEach(region => {
-          let rTotal = 0;
-          let provsHTML = '';
-          const provinces = stats.grouped[region];
-          
-          Object.keys(provinces).forEach(prov => {
-            let pTotal = 0;
-            const dealers = provinces[prov].filter(d => d[state.selectedMetric] > 0);
-            
-            if (dealers.length > 0) {
-              let dealersHTML = dealers.map(d => {
-                pTotal += d[state.selectedMetric];
-                return `
-                  <div class="flex justify-between items-center py-2 pl-16 pr-4 text-sm hover:bg-slate-100">
-                    <div class="flex items-center">
-                      <i data-lucide="store" class="w-4 h-4 mr-2 text-gray-400"></i>
-                      <span class="text-gray-600">${d.dealer}</span>
-                    </div>
-                    <span class="font-medium ${cfg.color}">${d[state.selectedMetric]} <span class="text-xs text-gray-500">${cfg.unit}</span></span>
-                  </div>
-                `;
-              }).join('');
-              
-              rTotal += pTotal;
-              provsHTML += `
-                <div class="border-b border-gray-100 last:border-0">
-                  <details class="group">
-                    <summary class="w-full flex items-center justify-between p-3 pl-10 bg-white hover:bg-slate-50 transition-colors cursor-pointer select-none">
-                      <div class="flex items-center">
-                        <i data-lucide="chevron-right" class="w-4 h-4 mr-2 text-gray-400 chevron-icon"></i>
-                        <span class="font-semibold text-gray-700">${prov}</span>
-                      </div>
-                      <span class="font-semibold ${cfg.color}">${pTotal} <span class="text-xs font-normal text-gray-500">${cfg.unit}</span></span>
-                    </summary>
-                    <div class="bg-slate-50 py-2 border-t border-gray-100">${dealersHTML}</div>
-                  </details>
-                </div>
-              `;
+      const showConfirm = (message, onConfirm) => {
+        setDialog({ isOpen: true, message, isConfirm: true, onConfirm });
+      };
+
+      const closeDialog = () => {
+        setDialog({ ...dialog, isOpen: false });
+      };
+
+      // --- Firebase Auth Initialization ---
+      useEffect(() => {
+        const initAuth = async () => {
+          try {
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+              await signInWithCustomToken(auth, __initial_auth_token);
+            } else {
+              await signInAnonymously(auth);
             }
-          });
-          
-          if (rTotal > 0) {
-            regionsHTML += `
-              <div class="border border-gray-200 rounded-lg overflow-hidden">
-                <details class="group">
-                  <summary class="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer select-none">
-                    <div class="flex items-center">
-                      <i data-lucide="chevron-right" class="w-5 h-5 mr-2 text-gray-500 chevron-icon"></i>
-                      <span class="font-bold text-gray-800 text-lg">${region}</span>
-                    </div>
-                    <span class="font-bold text-lg ${cfg.color}">${rTotal} <span class="text-sm font-normal text-gray-500">${cfg.unit}</span></span>
-                  </summary>
-                  <div class="p-0 border-t border-gray-200 bg-white">${provsHTML}</div>
-                </details>
-              </div>
-            `;
+          } catch (error) {
+            console.error("Firebase Auth Error:", error);
+          }
+        };
+        initAuth();
+
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+          setUser(currentUser);
+        });
+        return () => unsubscribe();
+      }, []);
+
+      // --- Firebase Data Fetching ---
+      useEffect(() => {
+        if (!user) return;
+
+        const dealersDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'dealersList');
+        const inventoryRef = collection(db, 'artifacts', appId, 'public', 'data', 'inventory');
+        const bookingsRef = collection(db, 'artifacts', appId, 'public', 'data', 'bookings');
+
+        const unsubDealers = onSnapshot(dealersDocRef, (docSnap) => {
+          if (docSnap.exists()) {
+            setDealersData(docSnap.data().list || []);
+          } else {
+            setDealersData([]);
+          }
+        }, (err) => console.error("Error fetching dealers:", err));
+
+        const unsubInventory = onSnapshot(inventoryRef, (snapshot) => {
+          const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+          setInventory(data);
+        }, (err) => console.error("Error fetching inventory:", err));
+
+        const unsubBookings = onSnapshot(bookingsRef, (snapshot) => {
+          const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+          setBookings(data);
+        }, (err) => console.error("Error fetching bookings:", err));
+
+        return () => {
+          unsubDealers();
+          unsubInventory();
+          unsubBookings();
+        };
+      }, [user]);
+
+      const PROVINCES = useMemo(() => {
+        return [...new Set(dealersData.map(d => d.province))].sort();
+      }, [dealersData]);
+
+      const handleReceiveCar = async (bookingId) => {
+        if (!user) return;
+        try {
+          const bookingRef = doc(db, 'artifacts', appId, 'public', 'data', 'bookings', bookingId);
+          await setDoc(bookingRef, { status: 'delivered' }, { merge: true });
+        } catch (error) {
+          console.error("Error updating status:", error);
+        }
+      };
+
+      // --- คำนวณสรุปผลทั้งหมด ---
+      const stats = useMemo(() => {
+        let totalCars = 0;
+        let totalBooked = 0;
+        let totalDelivered = 0;
+        let totalShortage = 0;
+
+        const dealerMap = {};
+        dealersData.forEach(d => {
+          dealerMap[d.name] = {
+            region: d.region,
+            province: d.province,
+            dealer: d.name,
+            totalCars: 0,
+            totalBooked: 0,
+            totalDelivered: 0,
+            totalShortage: 0,
+            demandByColor: {},
+            supplyByColor: {}
+          };
+        });
+
+        inventory.forEach(item => {
+          if (!dealerMap[item.dealer]) {
+            dealerMap[item.dealer] = { region: 'อื่นๆ', province: 'อื่นๆ', dealer: item.dealer, totalCars: 0, totalBooked: 0, totalDelivered: 0, totalShortage: 0, demandByColor: {}, supplyByColor: {} };
+          }
+          dealerMap[item.dealer].totalCars += item.qty;
+          const key = `${item.model}-${item.color}`;
+          dealerMap[item.dealer].supplyByColor[key] = (dealerMap[item.dealer].supplyByColor[key] || 0) + item.qty;
+          totalCars += item.qty;
+        });
+
+        bookings.forEach(b => {
+          if (!dealerMap[b.dealer]) {
+            dealerMap[b.dealer] = { region: 'อื่นๆ', province: 'อื่นๆ', dealer: b.dealer, totalCars: 0, totalBooked: 0, totalDelivered: 0, totalShortage: 0, demandByColor: {}, supplyByColor: {} };
+          }
+          const key = `${b.model}-${b.color}`;
+          if (b.status === 'booked') {
+            dealerMap[b.dealer].totalBooked += 1;
+            dealerMap[b.dealer].demandByColor[key] = (dealerMap[b.dealer].demandByColor[key] || 0) + 1;
+            totalBooked += 1;
+          }
+          if (b.status === 'delivered') {
+            dealerMap[b.dealer].totalDelivered += 1;
+            dealerMap[b.dealer].supplyByColor[key] = Math.max(0, (dealerMap[b.dealer].supplyByColor[key] || 0) - 1);
+            totalDelivered += 1;
           }
         });
 
-        if (!regionsHTML) {
-          bottomView = `
-            <div class="bg-white p-8 rounded-xl shadow-sm border border-gray-100 mt-6 text-center">
-              <i data-lucide="package" class="w-12 h-12 text-gray-300 mx-auto mb-3"></i>
-              <p class="text-gray-500 text-lg">ยังไม่มีข้อมูลสำหรับ <span class="font-bold">"${cfg.label}"</span></p>
-            </div>
-          `;
-        } else {
-          bottomView = `
-            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mt-6 animate-in fade-in duration-300">
-              <div class="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
-                <h3 class="text-lg font-bold text-gray-800">เจาะลึกข้อมูล: <span class="${cfg.color}">${cfg.label}</span></h3>
-                <span class="text-sm text-gray-500">คลิกที่รายการเพื่อดูข้อมูลแต่ละระดับ</span>
-              </div>
-              <div class="space-y-3">${regionsHTML}</div>
-            </div>
-          `;
-        }
-
-      } else {
-        // Standard View
-        const invRows = state.inventory.map(item => `
-          <tr class="border-b border-gray-50 last:border-0 text-sm">
-            <td class="p-3 text-gray-800">${item.dealer}</td>
-            <td class="p-3 text-gray-600"><div class="font-medium">${item.model}</div><div class="text-xs">${item.color}</div></td>
-            <td class="p-3 text-right font-medium text-blue-600">${item.qty} คัน</td>
-          </tr>
-        `).join('') || `<tr><td colspan="3" class="text-center py-4 text-gray-500">ยังไม่มีข้อมูลสต็อกรถ</td></tr>`;
-
-        const bookRows = state.bookings.map(b => `
-          <tr class="border-b border-gray-50 last:border-0 text-sm">
-            <td class="p-3 text-gray-800 font-medium">${b.customerName}</td>
-            <td class="p-3 text-gray-600"><div class="text-xs font-semibold text-gray-500">${b.dealer}</div><div>${b.model} - ${b.color}</div></td>
-            <td class="p-3 text-right">
-              ${b.status === 'booked' 
-                ? `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700">รอรับรถ</span>`
-                : `<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">รับรถแล้ว</span>`
-              }
-            </td>
-          </tr>
-        `).join('') || `<tr><td colspan="3" class="text-center py-4 text-gray-500">ยังไม่มีข้อมูลการจอง</td></tr>`;
-
-        bottomView = `
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6 animate-in fade-in duration-300">
-            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-              <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center"><i data-lucide="package" class="w-5 h-5 mr-2 text-gray-500"></i> สต็อกล่าสุด (รายดีลเลอร์)</h3>
-              <div class="overflow-x-auto">
-                <table class="w-full text-left">
-                  <thead class="bg-gray-50 text-gray-600 text-sm"><tr><th class="p-3 rounded-tl-lg">ดีลเลอร์</th><th class="p-3">รุ่นรถ / สีรถ</th><th class="p-3 rounded-tr-lg text-right">จำนวนทั้งหมด</th></tr></thead>
-                  <tbody>${invRows}</tbody>
-                </table>
-              </div>
-            </div>
-            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-              <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center"><i data-lucide="users" class="w-5 h-5 mr-2 text-gray-500"></i> รายการจองล่าสุด</h3>
-              <div class="overflow-x-auto">
-                <table class="w-full text-left">
-                  <thead class="bg-gray-50 text-gray-600 text-sm"><tr><th class="p-3 rounded-tl-lg">ลูกค้า</th><th class="p-3">ดีลเลอร์ / รุ่นและสี</th><th class="p-3 rounded-tr-lg text-right">สถานะ</th></tr></thead>
-                  <tbody>${bookRows}</tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        `;
-      }
-
-      return `
-        <div class="space-y-6">
-          <div class="flex justify-between items-end">
-            <h2 class="text-2xl font-bold text-gray-800">ภาพรวมระบบ (Overview)</h2>
-            <span class="text-sm text-gray-500">💡 คลิกที่การ์ดเพื่อดูข้อมูลเจาะลึกแต่ละภาค</span>
-          </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            ${statCard("รถเข้ามาทั้งหมด", stats.totalCars, "car", "totalCars", "bg-blue-100", "text-blue-600", "ring-blue-500")}
-            ${statCard("จองแล้ว (รอรับรถ)", stats.totalBooked, "users", "totalBooked", "bg-orange-100", "text-orange-600", "ring-orange-500")}
-            ${statCard("สถานะรถขาด (Shortage)", stats.totalShortage, "alert-triangle", "totalShortage", "bg-red-100", "text-red-600", "ring-red-500")}
-            ${statCard("รับรถไปแล้ว (Delivered)", stats.totalDelivered, "check-circle", "totalDelivered", "bg-green-100", "text-green-600", "ring-green-500")}
-          </div>
-          ${bottomView}
-        </div>
-      `;
-    }
-
-    function getDealerHTML() {
-      const provinces = getProvinces();
-      const dealers = getDealersByProvince(state.dealerForm.province);
-      const disabledClass = state.dealersData.length === 0 ? "opacity-50 cursor-not-allowed" : "";
-      const placeholder = state.dealersData.length === 0 ? "-- กรุณาอัปโหลดฐานข้อมูลก่อน --" : "-- พิมพ์เพื่อค้นหา --";
-      const dealerInfo = getDealerInfo(state.dealerForm.dealer, state.dealerForm.province);
-      
-      const filteredInventory = state.dealerForm.dealer ? state.inventory.filter(i => i.dealer === state.dealerForm.dealer) : state.inventory;
-
-      let invTable = filteredInventory.map(item => `
-        <tr class="border-b border-gray-50 last:border-0 text-sm hover:bg-slate-50">
-          <td class="p-3 text-gray-800"><div class="font-medium">${item.model}</div><div class="text-gray-500 text-xs">${item.color}</div></td>
-          <td class="p-3 text-center">
-            ${state.editingInventoryId === item.id 
-              ? `<input type="number" id="edit-qty-${item.id}" value="${state.editQtyValue}" class="w-20 text-center p-1 border border-blue-400 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" min="0">`
-              : `<span class="font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full">${item.qty} คัน</span>`
+        Object.values(dealerMap).forEach(d => {
+          Object.keys(d.demandByColor).forEach(key => {
+            const demand = d.demandByColor[key];
+            const supply = d.supplyByColor[key] || 0;
+            if (demand > supply) {
+              const shortageQty = demand - supply;
+              d.totalShortage += shortageQty;
+              totalShortage += shortageQty;
             }
-          </td>
-          <td class="p-3 text-right">
-            ${state.editingInventoryId === item.id
-              ? `<div class="flex justify-end space-x-2">
-                  <button type="button" onclick="appActions.saveEditInventory('${item.id}')" class="text-xs bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded transition-colors">บันทึก</button>
-                  <button type="button" onclick="appActions.cancelEditInventory()" class="text-xs bg-gray-300 hover:bg-gray-400 text-gray-700 px-2 py-1 rounded transition-colors">ยกเลิก</button>
-                 </div>`
-              : `<div class="flex justify-end space-x-2">
-                  <button type="button" onclick="appActions.startEditInventory('${item.id}', ${item.qty})" class="p-1.5 text-blue-500 hover:bg-blue-100 rounded transition-colors"><i data-lucide="edit-2" class="w-4 h-4"></i></button>
-                  <button type="button" onclick="appActions.deleteInventory('${item.id}')" class="p-1.5 text-red-500 hover:bg-red-100 rounded transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                 </div>`
-            }
-          </td>
-        </tr>
-      `).join('');
+          });
+        });
 
-      if(!state.dealerForm.dealer) {
-        invTable = `<tr><td colspan="3"><div class="text-center py-12 text-gray-500"><i data-lucide="store" class="w-12 h-12 mx-auto mb-3 text-gray-300"></i><p>กรุณาเลือกจังหวัดและดีลเลอร์ทางด้านซ้าย<br/>เพื่อดูและจัดการสต็อกของสาขานั้นๆ</p></div></td></tr>`;
-      } else if(filteredInventory.length === 0) {
-        invTable = `<tr><td colspan="3"><div class="text-center py-12 text-gray-500"><i data-lucide="package" class="w-12 h-12 mx-auto mb-3 text-gray-300"></i><p>ยังไม่มีข้อมูลสต็อกรถสำหรับสาขานี้</p></div></td></tr>`;
-      }
+        const grouped = {};
+        Object.values(dealerMap).forEach(d => {
+          if (!grouped[d.region]) grouped[d.region] = {};
+          if (!grouped[d.region][d.province]) grouped[d.region][d.province] = [];
+          grouped[d.region][d.province].push(d);
+        });
 
-      return `
-        <div class="max-w-4xl mx-auto space-y-6">
-          <div class="text-center mb-8">
-            <h2 class="text-2xl font-bold text-gray-800">อัปเดตสต็อกรถ (สำหรับดีลเลอร์)</h2>
-            <p class="text-gray-500 mt-2">แจ้งจำนวนรถและสีที่เข้ามาถึงสาขาของท่าน หรือแก้ไขข้อมูลเดิม</p>
-          </div>
-          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        return { totalCars, totalBooked, totalDelivered, totalShortage, grouped };
+      }, [inventory, bookings, dealersData]);
+
+      // --- Views ---
+      const DashboardView = () => {
+        const [selectedMetric, setSelectedMetric] = useState(null);
+
+        const handleCardClick = (metric) => {
+          setSelectedMetric(prev => prev === metric ? null : metric); 
+        };
+
+        const StatCard = ({ title, value, icon: Icon, metricKey, baseColor, ringColor }) => {
+          const isActive = selectedMetric === metricKey;
+          return (
+            <button
+              onClick={() => handleCardClick(metricKey)}
+              className={`w-full text-left bg-white p-6 rounded-xl shadow-sm border transition-all duration-200 flex items-center space-x-4
+                ${isActive ? `ring-2 ring-offset-2 ${ringColor} border-transparent bg-slate-50` : 'border-gray-100 hover:border-gray-300 hover:bg-gray-50'}`}
+            >
+              <div className={`p-3 ${baseColor} rounded-lg`}>
+                <Icon className="w-8 h-8" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500 font-medium">{title}</p>
+                <p className={`text-2xl font-bold ${isActive ? ringColor.replace('ring', 'text') : 'text-gray-800'}`}>
+                  {value} <span className={`text-sm font-normal ${isActive ? 'opacity-80' : 'text-gray-500'}`}>คัน</span>
+                </p>
+              </div>
+            </button>
+          );
+        };
+
+        const DrillDownModal = () => {
+          if (!selectedMetric) return null;
+
+          const metricConfigs = {
+            totalCars: { label: "รถเข้ามาทั้งหมด", unit: "คัน", color: "text-blue-600" },
+            totalBooked: { label: "จองแล้ว (รอรับรถ)", unit: "คัน", color: "text-orange-600" },
+            totalShortage: { label: "สถานะรถขาด", unit: "คัน", color: "text-red-600" },
+            totalDelivered: { label: "รับรถไปแล้ว", unit: "คัน", color: "text-green-600" }
+          };
+
+          const config = metricConfigs[selectedMetric];
+
+          const regionData = Object.keys(stats.grouped).map(region => {
+            let regionTotal = 0;
+            const provinces = stats.grouped[region];
             
-            <div class="lg:col-span-1 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-              <h3 class="font-bold text-gray-800 mb-4 border-b pb-2">แบบฟอร์มเพิ่มสต็อกใหม่</h3>
-              <form id="dealer-form" onsubmit="appActions.submitDealerForm(event)" class="space-y-4">
-                <div class="space-y-4">
+            const provinceData = Object.keys(provinces).map(prov => {
+              let provTotal = 0;
+              const dealers = provinces[prov].filter(d => d[selectedMetric] > 0); 
+              
+              dealers.forEach(d => { provTotal += d[selectedMetric]; });
+              regionTotal += provTotal;
+              return { name: prov, total: provTotal, dealers };
+            }).filter(p => p.total > 0); 
+
+            return { name: region, total: regionTotal, provinces: provinceData };
+          }).filter(r => r.total > 0); 
+
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className="bg-gray-50 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-white">
                   <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">เลือก/ค้นหา จังหวัด</label>
-                    <div class="relative w-full">
-                      <i data-lucide="map-pin" class="absolute left-3 top-3 w-5 h-5 text-gray-400 z-10"></i>
-                      <input list="dl-provs" name="province" class="w-full pl-10 pr-10 p-2.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${disabledClass}" placeholder="${placeholder}" ${state.dealersData.length===0?'disabled':''} value="${state.dealerForm.province}" onchange="appActions.dealerProvinceChange(this.value)" required autocomplete="off">
-                      ${getDatalistHTML('dl-provs', provinces)}
+                    <h3 className="text-xl font-bold text-gray-800">
+                      เจาะลึกข้อมูล: <span className={config.color}>{config.label}</span>
+                    </h3>
+                    <span className="text-sm text-gray-500">คลิกที่รายการเพื่อดูข้อมูลระดับจังหวัดและสาขา</span>
+                  </div>
+                  <button onClick={() => setSelectedMetric(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500 hover:text-gray-700">
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+                
+                <div className="overflow-y-auto p-6 flex-1">
+                  {regionData.length === 0 ? (
+                    <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100 text-center">
+                      <Package className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                      <p className="text-gray-500 text-lg">ยังไม่มีข้อมูลสำหรับ <span className="font-bold">"{config.label}"</span></p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {regionData.map(region => (
+                        <RegionAccordion key={region.name} region={region} config={config} selectedMetric={selectedMetric} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        };
+
+        const RegionAccordion = ({ region, config, selectedMetric }) => {
+          const [isOpen, setIsOpen] = useState(false);
+          return (
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <button 
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
+              >
+                <div className="flex items-center">
+                  {isOpen ? <ChevronDown className="w-5 h-5 mr-2 text-gray-500" /> : <ChevronRight className="w-5 h-5 mr-2 text-gray-500" />}
+                  <span className="font-bold text-gray-800 text-lg">{region.name}</span>
+                </div>
+                <span className={`font-bold text-lg ${config.color}`}>{region.total} <span className="text-sm font-normal text-gray-500">{config.unit}</span></span>
+              </button>
+              
+              {isOpen && (
+                <div className="p-0 border-t border-gray-200 bg-white">
+                  {region.provinces.map(prov => (
+                    <ProvinceAccordion key={prov.name} province={prov} config={config} selectedMetric={selectedMetric} />
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        };
+
+        const ProvinceAccordion = ({ province, config, selectedMetric }) => {
+          const [isOpen, setIsOpen] = useState(false);
+          return (
+            <div className="border-b border-gray-100 last:border-0">
+              <button 
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full flex items-center justify-between p-3 pl-10 bg-white hover:bg-slate-50 transition-colors"
+              >
+                <div className="flex items-center">
+                  {isOpen ? <ChevronDown className="w-4 h-4 mr-2 text-gray-400" /> : <ChevronRight className="w-4 h-4 mr-2 text-gray-400" />}
+                  <span className="font-semibold text-gray-700">{province.name}</span>
+                </div>
+                <span className={`font-semibold ${config.color}`}>{province.total} <span className="text-xs font-normal text-gray-500">{config.unit}</span></span>
+              </button>
+              
+              {isOpen && (
+                <div className="bg-slate-50 py-2">
+                  {province.dealers.map(dealer => (
+                    <div key={dealer.dealer} className="flex justify-between items-center py-2 pl-16 pr-4 text-sm hover:bg-slate-100">
+                      <div className="flex items-center">
+                        <Store className="w-4 h-4 mr-2 text-gray-400" />
+                        <span className="text-gray-600">{dealer.dealer}</span>
+                      </div>
+                      <span className={`font-medium ${config.color}`}>{dealer[selectedMetric]} <span className="text-xs text-gray-500">{config.unit}</span></span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        };
+
+        return (
+          <div className="space-y-10 pb-10">
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <h2 className="text-2xl font-bold text-gray-800 mb-6">ภาพรวมระบบ (Overview)</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <button 
+                  onClick={() => setActiveTab('dealer')}
+                  className="group bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-gray-100 hover:border-blue-200 hover:shadow-lg transition-all duration-300 text-left flex flex-col sm:flex-row items-start sm:items-center gap-6 overflow-hidden relative"
+                >
+                  <div className="bg-blue-50 p-5 rounded-2xl group-hover:scale-110 group-hover:bg-blue-100 transition-all duration-300 shrink-0">
+                    <Store className="w-10 h-10 text-blue-600" />
+                  </div>
+                  <div className="z-10">
+                    <h3 className="text-xl sm:text-2xl font-bold text-gray-800 group-hover:text-blue-600 transition-colors">อัปเดตสต็อกรถ</h3>
+                    <p className="text-gray-500 mt-2 text-sm sm:text-base">สำหรับดีลเลอร์</p>
+                  </div>
+                  <ChevronRight className="absolute right-6 opacity-0 group-hover:opacity-100 group-hover:translate-x-2 transition-all w-6 h-6 text-blue-300 hidden sm:block" />
+                </button>
+
+                <button 
+                  onClick={() => setActiveTab('buyer')}
+                  className="group bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-gray-100 hover:border-orange-200 hover:shadow-lg transition-all duration-300 text-left flex flex-col sm:flex-row items-start sm:items-center gap-6 overflow-hidden relative"
+                >
+                  <div className="bg-orange-50 p-5 rounded-2xl group-hover:scale-110 group-hover:bg-orange-100 transition-all duration-300 shrink-0">
+                    <Users className="w-10 h-10 text-orange-600" />
+                  </div>
+                  <div className="z-10">
+                    <h3 className="text-xl sm:text-2xl font-bold text-gray-800 group-hover:text-orange-600 transition-colors">ระบบลูกค้า</h3>
+                    <p className="text-gray-500 mt-2 text-sm sm:text-base">จองและรับรถ</p>
+                  </div>
+                  <ChevronRight className="absolute right-6 opacity-0 group-hover:opacity-100 group-hover:translate-x-2 transition-all w-6 h-6 text-orange-300 hidden sm:block" />
+                </button>
+              </div>
+            </div>
+
+            <div className="animate-in fade-in slide-in-from-bottom-8 duration-700">
+              <div className="flex justify-between items-end mb-4">
+                <h3 className="text-xl font-bold text-gray-800">สรุปข้อมูล (สถิติ)</h3>
+                <span className="text-xs sm:text-sm text-gray-500">💡 คลิกการ์ดเพื่อดูเจาะลึก</span>
+              </div>
+              
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                <StatCard title="รถเข้ามาทั้งหมด" value={stats.totalCars} icon={Car} metricKey="totalCars" baseColor="bg-blue-100 text-blue-600" ringColor="ring-blue-500" />
+                <StatCard title="จองแล้ว (รอรับรถ)" value={stats.totalBooked} icon={Users} metricKey="totalBooked" baseColor="bg-orange-100 text-orange-600" ringColor="ring-orange-500" />
+                <StatCard title="สถานะรถขาด" value={stats.totalShortage} icon={AlertTriangle} metricKey="totalShortage" baseColor="bg-red-100 text-red-600" ringColor="ring-red-500" />
+                <StatCard title="รับรถไปแล้ว" value={stats.totalDelivered} icon={CheckCircle} metricKey="totalDelivered" baseColor="bg-green-100 text-green-600" ringColor="ring-green-500" />
+              </div>
+            </div>
+
+            <DrillDownModal />
+          </div>
+        );
+      };
+
+      const DealerPortal = () => {
+        const [selectedProvince, setSelectedProvince] = useState('');
+        const [selectedDealer, setSelectedDealer] = useState('');
+        const [editingItemId, setEditingItemId] = useState(null);
+        const [editQty, setEditQty] = useState('');
+
+        const availableDealers = useMemo(() => {
+          if (!selectedProvince) return [];
+          return dealersData.filter(d => d.province === selectedProvince).map(d => d.name);
+        }, [selectedProvince]);
+
+        const selectedDealerInfo = useMemo(() => {
+          return dealersData.find(d => d.name === selectedDealer && d.province === selectedProvince);
+        }, [selectedDealer, selectedProvince]);
+
+        const handleDealerSubmit = async (e) => {
+          e.preventDefault();
+          if (!user) {
+            showAlert("กรุณารอการเชื่อมต่อฐานข้อมูลสักครู่");
+            return;
+          }
+          const formData = new FormData(e.target);
+          const model = formData.get('model');
+          const color = formData.get('color');
+          const qty = parseInt(formData.get('qty'), 10);
+
+          if (!selectedDealer || !model || !color || qty <= 0) return;
+
+          try {
+            const existing = inventory.find(item => item.dealer === selectedDealer && item.model === model && item.color === color);
+            if (existing) {
+              const itemRef = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', existing.id);
+              await setDoc(itemRef, { ...existing, qty: existing.qty + qty });
+            } else {
+              const newRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'inventory'));
+              await setDoc(newRef, { dealer: selectedDealer, model, color, qty });
+            }
+            e.target.reset(); 
+          } catch (error) {
+            console.error("Error saving inventory:", error);
+          }
+        };
+
+        const handleEditStart = (item) => {
+          setEditingItemId(item.id);
+          setEditQty(item.qty.toString());
+        };
+
+        const handleEditSave = async (id) => {
+          if (!user) return;
+          const newQty = parseInt(editQty, 10);
+          if (isNaN(newQty) || newQty < 0) return;
+
+          try {
+            const itemRef = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', id);
+            if (newQty === 0) {
+              await deleteDoc(itemRef);
+            } else {
+              await setDoc(itemRef, { qty: newQty }, { merge: true });
+            }
+            setEditingItemId(null);
+          } catch (error) {
+            console.error("Error editing inventory:", error);
+          }
+        };
+
+        const handleDelete = (id) => {
+          if (!user) return;
+          showConfirm('คุณแน่ใจหรือไม่ว่าต้องการลบรายการสต็อกนี้?', async () => {
+            try {
+              await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', id));
+            } catch (error) {
+              console.error("Error deleting inventory:", error);
+            }
+          });
+        };
+        
+        const filteredInventory = useMemo(() => {
+            if (selectedDealer) {
+                return inventory.filter(item => item.dealer === selectedDealer);
+            }
+            return inventory;
+        }, [inventory, selectedDealer]);
+
+        const provincePlaceholder = dealersData.length === 0 ? "-- กรุณาอัปโหลดฐานข้อมูลก่อน --" : "-- พิมพ์จังหวัด --";
+
+        return (
+          <div className="max-w-4xl mx-auto space-y-6">
+            <div className="text-center mb-8">
+              <h2 className="text-2xl font-bold text-gray-800">อัปเดตสต็อกรถ (สำหรับดีลเลอร์)</h2>
+              <p className="text-gray-500 mt-2">แจ้งจำนวนรถและสีที่เข้ามาถึงสาขาของท่าน หรือแก้ไขข้อมูลเดิม</p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-1 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <h3 className="font-bold text-gray-800 mb-4 border-b pb-2">แบบฟอร์มเพิ่มสต็อกใหม่</h3>
+                <form onSubmit={handleDealerSubmit} className="space-y-4">
+                  <div className="space-y-4 relative z-20">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">เลือก/ค้นหา จังหวัด</label>
+                      <SearchableSelect 
+                        options={PROVINCES}
+                        value={selectedProvince}
+                        onChange={(val) => {
+                          setSelectedProvince(val);
+                          setSelectedDealer('');
+                        }}
+                        placeholder={provincePlaceholder}
+                        disabled={dealersData.length === 0}
+                        icon={MapPin}
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">เลือก/ค้นหา ดีลเลอร์</label>
+                      <SearchableSelect 
+                        options={availableDealers}
+                        value={selectedDealer}
+                        onChange={setSelectedDealer}
+                        placeholder={selectedProvince ? "-- พิมพ์ชื่อสาขา --" : "กรุณาเลือกจังหวัดก่อน"}
+                        disabled={!selectedProvince}
+                        icon={Store}
+                      />
                     </div>
                   </div>
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">เลือก/ค้นหา ดีลเลอร์</label>
-                    <div class="relative w-full">
-                      <i data-lucide="store" class="absolute left-3 top-3 w-5 h-5 text-gray-400 z-10"></i>
-                      <input list="dl-dealers" name="dealer" class="w-full pl-10 pr-10 p-2.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${!state.dealerForm.province ? 'opacity-50' : ''}" placeholder="${state.dealerForm.province ? placeholder : '-- เลือกจังหวัดก่อน --'}" ${!state.dealerForm.province?'disabled':''} value="${state.dealerForm.dealer}" onchange="appActions.dealerNameChange(this.value)" required autocomplete="off">
-                      ${getDatalistHTML('dl-dealers', dealers)}
+
+                  <div className="space-y-4 mt-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">รุ่นรถ</label>
+                      <select 
+                        name="model"
+                        className="w-full p-2.5 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50"
+                        required
+                        disabled={!selectedDealer}
+                      >
+                        <option value="">-- ระบุรุ่นรถ --</option>
+                        {CAR_MODELS.map(m => <option key={m} value={m}>{m}</option>)}
+                      </select>
                     </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">สีรถ</label>
+                      <select 
+                        name="color"
+                        className="w-full p-2.5 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50"
+                        required
+                        disabled={!selectedDealer}
+                      >
+                        <option value="">-- ระบุสี --</option>
+                        {CAR_COLORS.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">จำนวนที่รับเข้า (คัน)</label>
+                      <input 
+                        type="number" 
+                        name="qty"
+                        min="1"
+                        className="w-full p-2.5 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50"
+                        required
+                        placeholder="เช่น 5"
+                        disabled={!selectedDealer}
+                      />
+                    </div>
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    disabled={!selectedDealer}
+                    className="w-full mt-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-medium py-3 px-4 rounded-lg flex justify-center items-center transition-colors"
+                  >
+                    <Plus className="w-5 h-5 mr-2" /> บันทึกสต็อกรถ
+                  </button>
+                </form>
+                
+                <div className="mt-4">
+                  <DealerInfoCard dealerData={selectedDealerInfo} />
+                </div>
+              </div>
+
+              <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                 <h3 className="font-bold text-gray-800 mb-4 border-b pb-2 flex items-center justify-between">
+                   <span>จัดการรายการสต็อก</span>
+                   {selectedDealer && <span className="text-sm font-normal text-blue-600 bg-blue-50 px-2 py-1 rounded">แสดงข้อมูล: {selectedDealer}</span>}
+                 </h3>
+
+                 {!selectedDealer ? (
+                     <div className="text-center py-12 text-gray-500">
+                         <Store className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                         <p>กรุณาเลือกจังหวัดและดีลเลอร์ทางด้านซ้าย<br/>เพื่อดูและจัดการสต็อกของสาขานั้นๆ</p>
+                     </div>
+                 ) : filteredInventory.length === 0 ? (
+                    <div className="text-center py-12 text-gray-500">
+                        <Package className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                        <p>ยังไม่มีข้อมูลสต็อกรถสำหรับสาขานี้</p>
+                    </div>
+                 ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left">
+                        <thead className="bg-gray-50 text-gray-600 text-sm">
+                          <tr>
+                            <th className="p-3 rounded-tl-lg w-1/2">รุ่นรถและสี</th>
+                            <th className="p-3 text-center">จำนวนทั้งหมด</th>
+                            <th className="p-3 rounded-tr-lg text-right w-1/4">จัดการ</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredInventory.map(item => (
+                            <tr key={item.id} className="border-b border-gray-50 last:border-0 text-sm hover:bg-slate-50">
+                              <td className="p-3 text-gray-800">
+                                <div className="font-medium">{item.model}</div>
+                                <div className="text-gray-500 text-xs">{item.color}</div>
+                              </td>
+                              <td className="p-3 text-center">
+                                {editingItemId === item.id ? (
+                                    <input 
+                                        type="number" 
+                                        value={editQty} 
+                                        onChange={(e) => setEditQty(e.target.value)}
+                                        className="w-20 text-center p-1 border border-blue-400 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        min="0"
+                                    />
+                                ) : (
+                                    <span className="font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full">{item.qty} คัน</span>
+                                )}
+                              </td>
+                              <td className="p-3 text-right">
+                                 {editingItemId === item.id ? (
+                                     <div className="flex justify-end space-x-2">
+                                         <button 
+                                            onClick={() => handleEditSave(item.id)}
+                                            className="text-xs bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded transition-colors"
+                                         >
+                                             บันทึก
+                                         </button>
+                                         <button 
+                                            onClick={() => setEditingItemId(null)}
+                                            className="text-xs bg-gray-300 hover:bg-gray-400 text-gray-700 px-2 py-1 rounded transition-colors"
+                                         >
+                                             ยกเลิก
+                                         </button>
+                                     </div>
+                                 ) : (
+                                    <div className="flex justify-end space-x-2">
+                                        <button 
+                                            onClick={() => handleEditStart(item)}
+                                            title="แก้ไขจำนวน"
+                                            className="p-1.5 text-blue-500 hover:bg-blue-100 rounded transition-colors"
+                                        >
+                                            <Edit2 className="w-4 h-4" />
+                                        </button>
+                                        <button 
+                                            onClick={() => handleDelete(item.id)}
+                                            title="ลบรายการ"
+                                            className="p-1.5 text-red-500 hover:bg-red-100 rounded transition-colors"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                 )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                 )}
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      const BuyerPortal = () => {
+        const [selectedProvince, setSelectedProvince] = useState('');
+        const [selectedDealer, setSelectedDealer] = useState('');
+
+        const availableDealers = useMemo(() => {
+          if (!selectedProvince) return [];
+          return dealersData.filter(d => d.province === selectedProvince).map(d => d.name);
+        }, [selectedProvince]);
+
+        const selectedDealerInfo = useMemo(() => {
+          return dealersData.find(d => d.name === selectedDealer && d.province === selectedProvince);
+        }, [selectedDealer, selectedProvince]);
+
+        const handleBuyerSubmit = async (e) => {
+          e.preventDefault();
+          if (!user) {
+            showAlert("กรุณารอการเชื่อมต่อฐานข้อมูลสักครู่");
+            return;
+          }
+          const formData = new FormData(e.target);
+          const customerName = formData.get('customerName');
+          const model = formData.get('model');
+          const color = formData.get('color');
+
+          if (!customerName || !selectedDealer || !model || !color) return;
+
+          try {
+            const newRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'bookings'));
+            await setDoc(newRef, {
+              customerName,
+              province: selectedProvince,
+              dealer: selectedDealer,
+              model,
+              color,
+              status: 'booked',
+              createdAt: Date.now()
+            });
+            
+            setSelectedDealer('');
+            e.target.reset();
+          } catch (error) {
+            console.error("Error saving booking:", error);
+          }
+        };
+
+        const provincePlaceholder = dealersData.length === 0 ? "-- กรุณาอัปโหลดฐานข้อมูลก่อน --" : "-- พิมพ์จังหวัด --";
+
+        return (
+          <div className="max-w-3xl mx-auto space-y-8">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-gray-800">ระบบลูกค้า (จองและรับรถ)</h2>
+              <p className="text-gray-500 mt-2">ลงทะเบียนการจองรถ หรือยืนยันการรับรถแล้ว</p>
+            </div>
+
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+              <h3 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">แบบฟอร์มบันทึกการจอง</h3>
+              <form onSubmit={handleBuyerSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ชื่อ-นามสกุล ผู้จอง</label>
+                  <input 
+                    type="text" 
+                    name="customerName"
+                    className="w-full p-2.5 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    required
+                    placeholder="กรอกชื่อของคุณ"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-20">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">เลือก/ค้นหา จังหวัด</label>
+                    <SearchableSelect 
+                      options={PROVINCES}
+                      value={selectedProvince}
+                      onChange={(val) => {
+                        setSelectedProvince(val);
+                        setSelectedDealer('');
+                      }}
+                      placeholder={provincePlaceholder}
+                      disabled={dealersData.length === 0}
+                      icon={MapPin}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">เลือก/ค้นหา ดีลเลอร์</label>
+                    <SearchableSelect 
+                      options={availableDealers}
+                      value={selectedDealer}
+                      onChange={setSelectedDealer}
+                      placeholder={selectedProvince ? "-- พิมพ์ชื่อสาขา --" : "กรุณาเลือกจังหวัดก่อน"}
+                      disabled={!selectedProvince}
+                      icon={Store}
+                    />
                   </div>
                 </div>
-                <div class="space-y-4 mt-4">
+
+                <DealerInfoCard dealerData={selectedDealerInfo} />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                   <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">รุ่นรถ</label>
-                    <select name="model" class="w-full p-2.5 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${!state.dealerForm.dealer?'opacity-50':''}" required ${!state.dealerForm.dealer?'disabled':''}>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">รุ่นรถที่จอง</label>
+                    <select 
+                      name="model"
+                      className="w-full p-2.5 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      required
+                    >
                       <option value="">-- ระบุรุ่นรถ --</option>
-                      ${CAR_MODELS.map(m => `<option value="${m}" ${state.dealerForm.model === m ? 'selected' : ''}>${m}</option>`).join('')}
+                      {CAR_MODELS.map(m => <option key={m} value={m}>{m}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">สีรถ</label>
-                    <select name="color" class="w-full p-2.5 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${!state.dealerForm.dealer?'opacity-50':''}" required ${!state.dealerForm.dealer?'disabled':''}>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">สีรถที่จอง</label>
+                    <select 
+                      name="color"
+                      className="w-full p-2.5 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      required
+                    >
                       <option value="">-- ระบุสี --</option>
-                      ${CAR_COLORS.map(c => `<option value="${c}" ${state.dealerForm.color === c ? 'selected' : ''}>${c}</option>`).join('')}
+                      {CAR_COLORS.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
-                  </div>
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">จำนวนที่รับเข้า (คัน)</label>
-                    <input type="number" name="qty" min="1" value="${state.dealerForm.qty}" class="w-full p-2.5 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${!state.dealerForm.dealer?'opacity-50':''}" required placeholder="เช่น 5" ${!state.dealerForm.dealer?'disabled':''}>
                   </div>
                 </div>
-                <button type="submit" ${!state.dealerForm.dealer?'disabled':''} class="w-full mt-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-medium py-3 px-4 rounded-lg flex justify-center items-center transition-colors">
-                  <i data-lucide="plus" class="w-5 h-5 mr-2"></i> บันทึกสต็อกรถ
+
+                <button type="submit" className="w-full mt-4 bg-orange-600 hover:bg-orange-700 text-white font-medium py-3 px-4 rounded-lg flex justify-center items-center transition-colors">
+                  <Car className="w-5 h-5 mr-2" /> บันทึกการจองรถ
                 </button>
               </form>
-              ${getDealerInfoCardHTML(dealerInfo)}
             </div>
 
-            <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-              <h3 class="font-bold text-gray-800 mb-4 border-b pb-2 flex items-center justify-between">
-                <span>จัดการรายการสต็อก</span>
-                ${state.dealerForm.dealer ? `<span class="text-sm font-normal text-blue-600 bg-blue-50 px-2 py-1 rounded">แสดงข้อมูล: ${state.dealerForm.dealer}</span>` : ''}
-              </h3>
-              <div class="overflow-x-auto">
-                <table class="w-full text-left">
-                  <thead class="bg-gray-50 text-gray-600 text-sm"><tr><th class="p-3 rounded-tl-lg w-1/2">รุ่นรถและสี</th><th class="p-3 text-center">จำนวนทั้งหมด</th><th class="p-3 rounded-tr-lg text-right w-1/4">จัดการ</th></tr></thead>
-                  <tbody>${invTable}</tbody>
-                </table>
-              </div>
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+              <h3 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">รายการจองของลูกค้าทั้งหมด (รอรับรถ)</h3>
+              {bookings.filter(b => b.status === 'booked').length === 0 ? (
+                <p className="text-gray-500 text-center py-6">ไม่มีรายการจองที่ค้างอยู่</p>
+              ) : (
+                <div className="space-y-3">
+                  {bookings.filter(b => b.status === 'booked').map(b => (
+                    <div key={b.id} className="border border-gray-100 p-4 rounded-lg flex flex-col md:flex-row justify-between items-start md:items-center bg-gray-50">
+                      <div className="mb-3 md:mb-0">
+                        <p className="font-bold text-gray-800 text-lg">{b.customerName}</p>
+                        <p className="text-sm text-gray-600 mt-1">
+                          <Store className="w-4 h-4 inline mr-1 text-gray-400" /> {b.dealer} 
+                          <span className="mx-2">|</span> 
+                          <span className="font-medium">รุ่น:</span> {b.model} <span className="mx-1"></span> 
+                          <span className="font-medium">สี:</span> {b.color}
+                        </p>
+                      </div>
+                      <button 
+                        onClick={() => handleReceiveCar(b.id)}
+                        className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center transition-colors w-full md:w-auto justify-center"
+                      >
+                        <CheckCircle className="w-4 h-4 mr-2" /> ยืนยันการรับรถ
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
-        </div>
-      `;
-    }
+        );
+      };
 
-    function getBuyerHTML() {
-      const provinces = getProvinces();
-      const dealers = getDealersByProvince(state.buyerForm.province);
-      const disabledClass = state.dealersData.length === 0 ? "opacity-50 cursor-not-allowed" : "";
-      const placeholder = state.dealersData.length === 0 ? "-- กรุณาอัปโหลดฐานข้อมูลก่อน --" : "-- พิมพ์เพื่อค้นหา --";
-      const dealerInfo = getDealerInfo(state.buyerForm.dealer, state.buyerForm.province);
+      const AdminLoginView = () => {
+        const [loginError, setLoginError] = useState('');
 
-      const activeBookings = state.bookings.filter(b => b.status === 'booked');
-      const bookRows = activeBookings.length === 0 
-        ? `<p class="text-gray-500 text-center py-6">ไม่มีรายการจองที่ค้างอยู่</p>`
-        : `<div class="space-y-3">` + activeBookings.map(b => {
-            if (state.editingBookingId === b.id) {
-              return `
-                <div class="border border-blue-200 p-4 rounded-lg bg-blue-50 shadow-sm">
-                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
-                    <div>
-                      <label class="text-xs text-gray-500 mb-1 block">ชื่อลูกค้า</label>
-                      <input type="text" id="edit-b-name-${b.id}" value="${b.customerName}" class="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm">
-                    </div>
-                    <div>
-                      <label class="text-xs text-gray-500 mb-1 block">รุ่นรถ</label>
-                      <select id="edit-b-model-${b.id}" class="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm">
-                        ${CAR_MODELS.map(m => `<option value="${m}" ${m===b.model?'selected':''}>${m}</option>`).join('')}
-                      </select>
-                    </div>
-                    <div>
-                      <label class="text-xs text-gray-500 mb-1 block">สีรถ</label>
-                      <select id="edit-b-color-${b.id}" class="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm">
-                        ${CAR_COLORS.map(c => `<option value="${c}" ${c===b.color?'selected':''}>${c}</option>`).join('')}
-                      </select>
-                    </div>
-                  </div>
-                  <div class="flex justify-end space-x-2 mt-2">
-                    <button type="button" onclick="appActions.saveEditBooking('${b.id}')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded text-sm transition-colors">บันทึกการแก้ไข</button>
-                    <button type="button" onclick="appActions.cancelEditBooking()" class="bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-1.5 rounded text-sm transition-colors">ยกเลิก</button>
-                  </div>
-                </div>
-              `;
-            } else {
-              return `
-                <div class="border border-gray-100 p-4 rounded-lg flex flex-col md:flex-row justify-between items-start md:items-center bg-gray-50 hover:bg-white hover:shadow-sm transition-all duration-200">
-                  <div class="mb-3 md:mb-0">
-                    <p class="font-bold text-gray-800 text-lg">${b.customerName}</p>
-                    <p class="text-sm text-gray-600 mt-1">
-                      <i data-lucide="store" class="w-4 h-4 inline mr-1 text-gray-400"></i> ${b.dealer} 
-                      <span class="mx-2">|</span><span class="font-medium">รุ่น:</span> ${b.model} 
-                      <span class="mx-1"></span><span class="font-medium">สี:</span> ${b.color}
-                    </p>
-                  </div>
-                  <div class="flex flex-wrap gap-2 w-full md:w-auto">
-                    <button onclick="appActions.startEditBooking('${b.id}')" class="p-2 text-blue-500 hover:bg-blue-100 rounded-lg transition-colors border border-blue-200 bg-white" title="แก้ไขรายการ">
-                      <i data-lucide="edit-2" class="w-4 h-4"></i>
-                    </button>
-                    <button onclick="appActions.deleteBooking('${b.id}')" class="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors border border-red-200 bg-white" title="ยกเลิกการจอง">
-                      <i data-lucide="trash-2" class="w-4 h-4"></i>
-                    </button>
-                    <button onclick="appActions.receiveCar('${b.id}')" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center transition-colors">
-                      <i data-lucide="check-circle" class="w-4 h-4 mr-2"></i> ยืนยันการรับรถ
-                    </button>
-                  </div>
-                </div>
-              `;
-            }
-          }).join('') + `</div>`;
+        const handleLogin = (e) => {
+          e.preventDefault();
+          const formData = new FormData(e.target);
+          const username = formData.get('username');
+          const pass = formData.get('password');
 
-      return `
-        <div class="max-w-3xl mx-auto space-y-8">
-          <div class="text-center">
-            <h2 class="text-2xl font-bold text-gray-800">ระบบลูกค้า (จองและรับรถ)</h2>
-            <p class="text-gray-500 mt-2">ลงทะเบียนการจองรถ หรือยืนยันการรับรถแล้ว</p>
-          </div>
-          <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <h3 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2">แบบฟอร์มบันทึกการจอง</h3>
-            <form id="buyer-form" onsubmit="appActions.submitBuyerForm(event)" class="space-y-4">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">ชื่อ-นามสกุล ผู้จอง</label>
-                <!-- ใส่ค่ากลับเข้าไปอัตโนมัติ -->
-                <input type="text" name="customerName" value="${state.buyerForm.customerName}" class="w-full p-2.5 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-orange-500 focus:border-orange-500" required placeholder="กรอกชื่อของคุณ">
-              </div>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-20">
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">เลือก/ค้นหา จังหวัด</label>
-                  <div class="relative w-full">
-                    <i data-lucide="map-pin" class="absolute left-3 top-3 w-5 h-5 text-gray-400 z-10"></i>
-                    <!-- เปลี่ยน oninput เป็น onchange -->
-                    <input list="buy-provs" name="province" class="w-full pl-10 pr-10 p-2.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 ${disabledClass}" placeholder="${placeholder}" ${state.dealersData.length===0?'disabled':''} value="${state.buyerForm.province}" onchange="appActions.buyerProvinceChange(this.value)" required autocomplete="off">
-                    ${getDatalistHTML('buy-provs', provinces)}
-                  </div>
-                </div>
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">เลือก/ค้นหา ดีลเลอร์</label>
-                  <div class="relative w-full">
-                    <i data-lucide="store" class="absolute left-3 top-3 w-5 h-5 text-gray-400 z-10"></i>
-                    <input list="buy-dealers" name="dealer" class="w-full pl-10 pr-10 p-2.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 ${!state.buyerForm.province ? 'opacity-50' : ''}" placeholder="${state.buyerForm.province ? placeholder : '-- เลือกจังหวัดก่อน --'}" ${!state.buyerForm.province?'disabled':''} value="${state.buyerForm.dealer}" onchange="appActions.buyerNameChange(this.value)" required autocomplete="off">
-                    ${getDatalistHTML('buy-dealers', dealers)}
-                  </div>
-                </div>
-              </div>
-              ${getDealerInfoCardHTML(dealerInfo)}
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">รุ่นรถที่จอง</label>
-                  <select name="model" class="w-full p-2.5 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-orange-500 focus:border-orange-500" required>
-                    <option value="">-- ระบุรุ่นรถ --</option>
-                    ${CAR_MODELS.map(m => `<option value="${m}" ${state.buyerForm.model === m ? 'selected' : ''}>${m}</option>`).join('')}
-                  </select>
-                </div>
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">สีรถที่จอง</label>
-                  <select name="color" class="w-full p-2.5 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-orange-500 focus:border-orange-500" required>
-                    <option value="">-- ระบุสี --</option>
-                    ${CAR_COLORS.map(c => `<option value="${c}" ${state.buyerForm.color === c ? 'selected' : ''}>${c}</option>`).join('')}
-                  </select>
-                </div>
-              </div>
-              <button type="submit" class="w-full mt-4 bg-orange-600 hover:bg-orange-700 text-white font-medium py-3 px-4 rounded-lg flex justify-center items-center transition-colors">
-                <i data-lucide="car" class="w-5 h-5 mr-2"></i> บันทึกการจองรถ
-              </button>
-            </form>
-          </div>
-          <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <h3 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2">รายการจองของลูกค้าทั้งหมด (รอรับรถ)</h3>
-            ${bookRows}
-          </div>
-        </div>
-      `;
-    }
+          if (username === 'admin888' && pass === '999999999') {
+            setIsAdmin(true);
+            setLoginError('');
+          } else {
+            setLoginError('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+          }
+        };
 
-    function getDatabaseHTML() {
-      if (!state.isAdmin) {
-        return `
-          <div class="max-w-md mx-auto bg-white p-8 rounded-xl shadow-sm border border-gray-200 mt-10">
-            <div class="text-center mb-6">
-              <div class="bg-emerald-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <i data-lucide="lock" class="w-8 h-8 text-emerald-600"></i>
+        return (
+          <div className="max-w-md mx-auto bg-white p-8 rounded-xl shadow-sm border border-gray-200 mt-10">
+            <div className="text-center mb-6">
+              <div className="bg-emerald-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Lock className="w-8 h-8 text-emerald-600" />
               </div>
-              <h2 class="text-2xl font-bold text-gray-800">เข้าสู่ระบบ (Admin)</h2>
-              <p class="text-gray-500 mt-2 text-sm">กรุณาเข้าสู่ระบบเพื่อจัดการฐานข้อมูลสาขา</p>
+              <h2 className="text-2xl font-bold text-gray-800">เข้าสู่ระบบ (Admin)</h2>
+              <p className="text-gray-500 mt-2 text-sm">กรุณาเข้าสู่ระบบเพื่อจัดการฐานข้อมูลสาขา</p>
             </div>
-            <form onsubmit="appActions.adminLogin(event)" class="space-y-4">
+            
+            {loginError && (
+              <div className="mb-4 text-red-600 bg-red-50 p-3 rounded-lg text-sm border border-red-100 text-center">
+                {loginError}
+              </div>
+            )}
+            
+            <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">ชื่อผู้ใช้ (Username)</label>
-                <input type="text" name="username" required class="w-full p-2.5 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500" placeholder="กรอกชื่อผู้ใช้">
+                <label className="block text-sm font-medium text-gray-700 mb-1">ชื่อผู้ใช้ (Username)</label>
+                <input 
+                  type="text" 
+                  name="username" 
+                  required 
+                  className="w-full p-2.5 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500" 
+                  placeholder="กรอกชื่อผู้ใช้"
+                />
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">รหัสผ่าน (Password)</label>
-                <input type="password" name="password" required class="w-full p-2.5 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500" placeholder="กรอกรหัสผ่าน">
+                <label className="block text-sm font-medium text-gray-700 mb-1">รหัสผ่าน (Password)</label>
+                <input 
+                  type="password" 
+                  name="password" 
+                  required 
+                  className="w-full p-2.5 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500" 
+                  placeholder="กรอกรหัสผ่าน"
+                />
               </div>
-              <button type="submit" class="w-full mt-6 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-3 px-4 rounded-lg flex justify-center items-center transition-colors">
+              <button type="submit" className="w-full mt-6 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-3 px-4 rounded-lg flex justify-center items-center transition-colors">
                 เข้าสู่ระบบ
               </button>
             </form>
           </div>
-        `;
-      }
+        );
+      };
 
-      const tableRows = state.dealersData.length === 0 
-        ? `<tr><td colspan="3" class="p-8 text-center text-gray-500">ยังไม่มีข้อมูลในระบบ กรุณาอัปโหลดไฟล์ Excel</td></tr>`
-        : state.dealersData.map(d => `
-            <tr class="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-              <td class="p-3 text-gray-600">${d.region}</td>
-              <td class="p-3 text-gray-800 font-medium">${d.province}</td>
-              <td class="p-3 text-gray-700">${d.name}</td>
-            </tr>
-          `).join('');
+      const DatabaseManagerView = () => {
+        const handleFileUpload = (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
 
-      return `
-        <div class="max-w-4xl mx-auto space-y-6">
-          <div class="flex flex-col md:flex-row justify-between items-center mb-8 border-b border-gray-200 pb-4">
-            <div class="text-center md:text-left mb-4 md:mb-0">
-              <h2 class="text-2xl font-bold text-gray-800">จัดการฐานข้อมูลสาขา</h2>
-              <p class="text-gray-500 mt-2">อัปโหลดไฟล์ Excel (.xls, .xlsx) เพื่ออัปเดตรายชื่อสาขาเข้าสู่ระบบคลาวด์</p>
-            </div>
-            <button onclick="appActions.adminLogout()" class="flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-200 bg-white">
-              <i data-lucide="log-out" class="w-4 h-4 mr-2"></i> ออกจากระบบ
-            </button>
-          </div>
-          <div class="bg-white p-8 rounded-xl shadow-sm border border-gray-200 text-center">
-            <i data-lucide="file-spreadsheet" class="w-16 h-16 text-emerald-500 mx-auto mb-4"></i>
-            <h3 class="text-lg font-bold text-gray-800 mb-2">นำเข้าไฟล์ Excel รายชื่อผู้แทนจำหน่าย</h3>
-            <p class="text-sm text-gray-600 mb-6 max-w-md mx-auto">
-              คุณสามารถนำไฟล์ <strong>OMODA_JAECOO_Thailand_Dealers.xlsx</strong> มาอัปโหลดได้โดยตรง ข้อมูลจะถูกบันทึกขึ้นระบบ Cloud ทันที
-            </p>
-            <div class="relative inline-block">
-              <input type="file" accept=".xls,.xlsx" onchange="appActions.uploadExcel(event)" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer text-0">
-              <button type="button" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-3 px-6 rounded-lg flex items-center transition-colors pointer-events-none">
-                <i data-lucide="upload" class="w-5 h-5 mr-2"></i> อัปโหลดไฟล์ Excel ขึ้นระบบ
+          if (!window.XLSX) {
+            showAlert('ระบบกำลังโหลดโปรแกรมอ่านไฟล์ Excel กรุณารอสักครู่แล้วกดอัปโหลดใหม่อีกครั้งครับ');
+            return;
+          }
+
+          if (!user) {
+            showAlert('กรุณารอระบบเชื่อมต่อฐานข้อมูลสักครู่...');
+            return;
+          }
+
+          const reader = new FileReader();
+          reader.onload = async (event) => {
+            try {
+              const data = new Uint8Array(event.target.result);
+              const workbook = window.XLSX.read(data, { type: 'array' });
+              
+              const targetSheetName = workbook.SheetNames.find(name => name.includes('รายชื่อ')) || workbook.SheetNames[0];
+              const worksheet = workbook.Sheets[targetSheetName];
+              const jsonData = window.XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+              
+              const newData = [];
+              for (let i = 1; i < jsonData.length; i++) {
+                const row = jsonData[i];
+                if (!row || row.length === 0) continue;
+                
+                const region = row[0] ? String(row[0]).trim() : '-';
+                const name = row[1] ? String(row[1]).trim() : '-';
+                const province = row[2] ? String(row[2]).trim() : '-';
+                const address = row[3] ? String(row[3]).trim() : '-';
+                const phone = row[4] ? String(row[4]).trim() : '-';
+
+                if (name !== '-' && province !== '-' && name !== 'ชื่อโชว์รูม/ศูนย์บริการ') {
+                  newData.push({ region, name, province, address, phone });
+                }
+              }
+
+              if (newData.length > 0) {
+                const dealersDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'dealersList');
+                await setDoc(dealersDocRef, { list: newData });
+                
+                showAlert(`✅ อัปโหลดและบันทึกลงฐานข้อมูลสำเร็จทั้งหมด ${newData.length} สาขา! ข้อมูลจะถูก Sync ไปยังทุกคนที่กำลังใช้งานระบบ`);
+              } else {
+                showAlert('⚠️ ไม่พบข้อมูลสาขา หรือรูปแบบคอลัมน์ใน Excel ไม่ถูกต้อง');
+              }
+            } catch (error) {
+              console.error(error);
+              showAlert('❌ เกิดข้อผิดพลาดในการอ่านไฟล์หรือบันทึกข้อมูล');
+            }
+          };
+          
+          reader.readAsArrayBuffer(file);
+        };
+
+        return (
+          <div className="max-w-4xl mx-auto space-y-6">
+            <div className="flex flex-col md:flex-row justify-between items-center mb-8 border-b border-gray-200 pb-4">
+              <div className="text-center md:text-left mb-4 md:mb-0">
+                <h2 className="text-2xl font-bold text-gray-800">จัดการฐานข้อมูลสาขา</h2>
+                <p className="text-gray-500 mt-2">อัปโหลดไฟล์ Excel (.xls, .xlsx) เพื่ออัปเดตรายชื่อสาขาเข้าสู่ระบบคลาวด์</p>
+              </div>
+              <button 
+                onClick={() => setIsAdmin(false)}
+                className="flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-200 bg-white"
+              >
+                <LogOut className="w-4 h-4 mr-2" /> ออกจากระบบ
               </button>
             </div>
-          </div>
-          <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div class="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
-              <h3 class="font-bold text-gray-800 flex items-center">
-                <i data-lucide="database" class="w-5 h-5 mr-2 text-blue-600"></i> ตัวอย่างฐานข้อมูลปัจจุบันบนระบบ Cloud (${state.dealersData.length} สาขา)
-              </h3>
+
+            <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200 text-center">
+              <FileSpreadsheet className="w-16 h-16 text-emerald-500 mx-auto mb-4" />
+              <h3 className="text-lg font-bold text-gray-800 mb-2">นำเข้าไฟล์ Excel รายชื่อผู้แทนจำหน่าย</h3>
+              <p className="text-sm text-gray-600 mb-6 max-w-md mx-auto">
+                คุณสามารถนำไฟล์ <strong>OMODA_JAECOO_Thailand_Dealers.xlsx</strong> (หรือนามสกุล .xls) มาอัปโหลดได้โดยตรง ข้อมูลจะถูกบันทึกขึ้นระบบ Cloud ทันที
+              </p>
+              
+              <div className="relative inline-block">
+                <input 
+                  type="file" 
+                  accept=".xls,.xlsx" 
+                  onChange={handleFileUpload}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                />
+                <button className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-3 px-6 rounded-lg flex items-center transition-colors pointer-events-none">
+                  <Upload className="w-5 h-5 mr-2" /> อัปโหลดไฟล์ Excel ขึ้นระบบ
+                </button>
+              </div>
             </div>
-            <div class="overflow-x-auto max-h-96">
-              <table class="w-full text-left text-sm">
-                <thead class="bg-white sticky top-0 shadow-sm text-gray-600">
-                  <tr><th class="p-3 font-semibold whitespace-nowrap">ภูมิภาค</th><th class="p-3 font-semibold whitespace-nowrap">จังหวัด</th><th class="p-3 font-semibold whitespace-nowrap">ชื่อโชว์รูม/ศูนย์บริการ</th></tr>
-                </thead>
-                <tbody>${tableRows}</tbody>
-              </table>
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                <h3 className="font-bold text-gray-800 flex items-center">
+                  <Database className="w-5 h-5 mr-2 text-blue-600" /> 
+                  ตัวอย่างฐานข้อมูลปัจจุบันบนระบบ Cloud ({dealersData.length} สาขา)
+                </h3>
+              </div>
+              <div className="overflow-x-auto max-h-96">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-white sticky top-0 shadow-sm text-gray-600">
+                    <tr>
+                      <th className="p-3 font-semibold whitespace-nowrap">ภูมิภาค</th>
+                      <th className="p-3 font-semibold whitespace-nowrap">จังหวัด</th>
+                      <th className="p-3 font-semibold whitespace-nowrap">ชื่อโชว์รูม/ศูนย์บริการ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dealersData.length === 0 ? (
+                      <tr><td colSpan="3" className="p-8 text-center text-gray-500">ยังไม่มีข้อมูลในระบบ กรุณาอัปโหลดไฟล์ Excel</td></tr>
+                    ) : (
+                      dealersData.map((dealer, idx) => (
+                        <tr key={idx} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
+                          <td className="p-3 text-gray-600">{dealer.region}</td>
+                          <td className="p-3 text-gray-800 font-medium">{dealer.province}</td>
+                          <td className="p-3 text-gray-700">{dealer.name}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
+        );
+      };
+
+      return (
+        <div className="min-h-screen bg-gray-100 font-sans relative">
+          {/* Custom Global Dialog (แทนที่ window.alert / window.confirm) */}
+          {dialog.isOpen && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+               <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 text-center animate-in zoom-in-95 duration-200">
+                   {dialog.isConfirm ? (
+                       <AlertTriangle className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
+                   ) : (
+                       <AlertTriangle className="w-12 h-12 text-blue-500 mx-auto mb-4" />
+                   )}
+                   <p className="text-gray-800 text-lg mb-6">{dialog.message}</p>
+                   <div className="flex justify-center space-x-3">
+                      {dialog.isConfirm && (
+                         <button onClick={closeDialog} className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-lg transition-colors w-full">
+                           ยกเลิก
+                         </button>
+                      )}
+                      <button 
+                        onClick={() => { if(dialog.onConfirm) dialog.onConfirm(); closeDialog(); }} 
+                        className={`px-5 py-2.5 font-medium text-white rounded-lg transition-colors w-full ${dialog.isConfirm ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+                      >
+                         ตกลง
+                      </button>
+                   </div>
+               </div>
+            </div>
+          )}
+
+          <header className="bg-slate-900 text-white sticky top-0 z-10 shadow-md">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex justify-between items-center h-16">
+                <div className="flex items-center space-x-2">
+                  <Car className="w-8 h-8 text-blue-400" />
+                  <span className="font-bold text-xl tracking-tight">O&J Tracker</span>
+                </div>
+                <div className="flex items-center text-xs text-gray-400">
+                   <div className={`w-2 h-2 rounded-full mr-2 ${user ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`}></div>
+                   {user ? 'Cloud Connected' : 'Connecting...'}
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <div className="bg-white border-b border-gray-200">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <nav className="flex space-x-6 overflow-x-auto" aria-label="Tabs">
+                <button
+                  onClick={() => setActiveTab('dashboard')}
+                  className={`${
+                    activeTab === 'dashboard'
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center transition-colors`}
+                >
+                  <BarChart3 className="w-5 h-5 mr-2" />
+                  หน้าหลัก (Home)
+                </button>
+                <button
+                  onClick={() => setActiveTab('dealer')}
+                  className={`${
+                    activeTab === 'dealer'
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center transition-colors`}
+                >
+                  <Store className="w-5 h-5 mr-2" />
+                  ดีลเลอร์ (อัปเดตสต็อก)
+                </button>
+                <button
+                  onClick={() => setActiveTab('buyer')}
+                  className={`${
+                    activeTab === 'buyer'
+                      ? 'border-orange-500 text-orange-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center transition-colors`}
+                >
+                  <Users className="w-5 h-5 mr-2" />
+                  ลูกค้า (จอง/รับรถ)
+                </button>
+                <button
+                  onClick={() => setActiveTab('database')}
+                  className={`${
+                    activeTab === 'database'
+                      ? 'border-emerald-500 text-emerald-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center transition-colors`}
+                >
+                  <Database className="w-5 h-5 mr-2" />
+                  ตั้งค่าฐานข้อมูลสาขา
+                </button>
+              </nav>
+            </div>
+          </div>
+
+          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            {activeTab === 'dashboard' && <DashboardView />}
+            {activeTab === 'dealer' && <DealerPortal />}
+            {activeTab === 'buyer' && <BuyerPortal />}
+            {activeTab === 'database' && (!isAdmin ? <AdminLoginView /> : <DatabaseManagerView />)}
+          </main>
         </div>
-      `;
+      );
     }
 
-    renderApp();
-
+    const root = createRoot(document.getElementById('root'));
+    root.render(<App />);
   </script>
 </body>
 </html>
