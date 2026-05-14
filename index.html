@@ -68,8 +68,9 @@
     // แปลงตัวอักษรพิเศษที่ไม่รองรับใน Realtime Database ให้เป็น '_' เพื่อป้องกัน Error
     const safeAppId = appId.replace(/[\.#$\[\]]/g, '_');
 
-    const CAR_COLORS = ["White (ขาว)", "Black (ดำ)", "Grey (เทา)", "Green (เขียว)", "Silver (เงิน)"];
-    const CAR_MODELS = ["OMODA C5 EV", "JAECOO 6", "JAECOO 7 PHEV", "JAECOO 8 PHEV"];
+    // เพิ่มสีน้ำเงิน และรุ่น JAECOO J5
+    const CAR_COLORS = ["White (ขาว)", "Black (ดำ)", "Grey (เทา)", "Green (เขียว)", "Silver (เงิน)", "Blue (น้ำเงิน)"];
+    const CAR_MODELS = ["OMODA C5 EV", "JAECOO J5", "JAECOO 6", "JAECOO 7 PHEV", "JAECOO 8 PHEV"];
 
     // --- Custom Searchable Select Component ---
     const SearchableSelect = ({ options, value, onChange, placeholder, disabled, icon: Icon }) => {
