@@ -248,14 +248,40 @@
         return [...new Set(dealersData.map(d => d.province))].sort();
       }, [dealersData]);
 
-      const handleReceiveCar = async (bookingId) => {
+      const handleRequestReceiveCar = (bookingId) => {
+        if (!user) return;
+        showConfirm('ต้องการส่งคำขอยืนยันการรับรถให้แอดมินตรวจสอบใช่หรือไม่?', async () => {
+          try {
+            const bookingRef = ref(database, `artifacts/${safeAppId}/public/data/bookings/${bookingId}`);
+            await update(bookingRef, { status: 'pending_approval' });
+            showAlert("ส่งคำขอเรียบร้อยแล้ว กรุณารอแอดมินอนุมัติครับ");
+          } catch (error) {
+            console.error("Error updating status:", error);
+          }
+        });
+      };
+
+      const handleApproveCar = async (bookingId) => {
         if (!user) return;
         try {
           const bookingRef = ref(database, `artifacts/${safeAppId}/public/data/bookings/${bookingId}`);
           await update(bookingRef, { status: 'delivered' });
+          showAlert("อนุมัติการรับรถสำเร็จ!");
         } catch (error) {
-          console.error("Error updating status:", error);
+          console.error("Error approving status:", error);
         }
+      };
+
+      const handleRejectCar = async (bookingId) => {
+        if (!user) return;
+        showConfirm('ต้องการปฏิเสธคำขอนี้ และให้กลับไปเป็นสถานะจองใช่หรือไม่?', async () => {
+          try {
+            const bookingRef = ref(database, `artifacts/${safeAppId}/public/data/bookings/${bookingId}`);
+            await update(bookingRef, { status: 'booked' });
+          } catch (error) {
+            console.error("Error rejecting status:", error);
+          }
+        });
       };
 
       // --- คำนวณสรุปผลทั้งหมด ---
@@ -295,7 +321,7 @@
             dealerMap[b.dealer] = { region: 'อื่นๆ', province: 'อื่นๆ', dealer: b.dealer, totalCars: 0, totalBooked: 0, totalDelivered: 0, totalShortage: 0, demandByColor: {}, supplyByColor: {} };
           }
           const key = `${b.model}-${b.color}`;
-          if (b.status === 'booked') {
+          if (b.status === 'booked' || b.status === 'pending_approval') {
             dealerMap[b.dealer].totalBooked += 1;
             dealerMap[b.dealer].demandByColor[key] = (dealerMap[b.dealer].demandByColor[key] || 0) + 1;
             totalBooked += 1;
@@ -938,11 +964,11 @@
 
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
               <h3 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">รายการจองของลูกค้าทั้งหมด (รอรับรถ)</h3>
-              {bookings.filter(b => b.status === 'booked').length === 0 ? (
+              {bookings.filter(b => b.status === 'booked' || b.status === 'pending_approval').length === 0 ? (
                 <p className="text-gray-500 text-center py-6">ไม่มีรายการจองที่ค้างอยู่</p>
               ) : (
                 <div className="space-y-3">
-                  {bookings.filter(b => b.status === 'booked').map(b => (
+                  {bookings.filter(b => b.status === 'booked' || b.status === 'pending_approval').map(b => (
                     <div key={b.id} className="border border-gray-100 p-4 rounded-lg flex flex-col md:flex-row justify-between items-start md:items-center bg-gray-50">
                       <div className="mb-3 md:mb-0">
                         <p className="font-bold text-gray-800 text-lg">{b.customerName}</p>
@@ -953,12 +979,18 @@
                           <span className="font-medium">สี:</span> {b.color}
                         </p>
                       </div>
-                      <button 
-                        onClick={() => handleReceiveCar(b.id)}
-                        className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center transition-colors w-full md:w-auto justify-center"
-                      >
-                        <CheckCircle className="w-4 h-4 mr-2" /> ยืนยันการรับรถ
-                      </button>
+                      {b.status === 'booked' ? (
+                        <button 
+                          onClick={() => handleRequestReceiveCar(b.id)}
+                          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center transition-colors w-full md:w-auto justify-center"
+                        >
+                          <CheckCircle className="w-4 h-4 mr-2" /> ยืนยันการรับรถ
+                        </button>
+                      ) : (
+                        <div className="bg-orange-100 text-orange-700 px-4 py-2 rounded-lg text-sm font-medium flex items-center w-full md:w-auto justify-center border border-orange-200">
+                          <AlertTriangle className="w-4 h-4 mr-2" /> รอแอดมินอนุมัติ...
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1092,8 +1124,8 @@
           <div className="max-w-4xl mx-auto space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-center mb-8 border-b border-gray-200 pb-4">
               <div className="text-center md:text-left mb-4 md:mb-0">
-                <h2 className="text-2xl font-bold text-gray-800">จัดการฐานข้อมูลสาขา</h2>
-                <p className="text-gray-500 mt-2">อัปโหลดไฟล์ Excel (.xls, .xlsx) เพื่ออัปเดตรายชื่อสาขาเข้าสู่ระบบคลาวด์</p>
+                <h2 className="text-2xl font-bold text-gray-800">ระบบผู้ดูแล (Admin)</h2>
+                <p className="text-gray-500 mt-2">อนุมัติการรับรถ และอัปเดตรายชื่อสาขาเข้าสู่ระบบคลาวด์</p>
               </div>
               <button 
                 onClick={() => setIsAdmin(false)}
@@ -1103,7 +1135,49 @@
               </button>
             </div>
 
-            <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200 text-center">
+            {/* ส่วนอนุมัติการรับรถ */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-orange-200">
+              <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center border-b pb-2">
+                <AlertTriangle className="w-5 h-5 mr-2 text-orange-500" />
+                รายการรออนุมัติรับรถ ({bookings.filter(b => b.status === 'pending_approval').length})
+              </h3>
+              
+              {bookings.filter(b => b.status === 'pending_approval').length === 0 ? (
+                <p className="text-gray-500 text-center py-6 bg-gray-50 rounded-lg">ไม่มีรายการรออนุมัติ</p>
+              ) : (
+                <div className="space-y-3">
+                  {bookings.filter(b => b.status === 'pending_approval').map(b => (
+                    <div key={b.id} className="border border-orange-100 p-4 rounded-lg flex flex-col md:flex-row justify-between items-start md:items-center bg-orange-50/50">
+                      <div className="mb-3 md:mb-0">
+                        <p className="font-bold text-gray-800 text-lg">{b.customerName}</p>
+                        <p className="text-sm text-gray-600 mt-1">
+                          <Store className="w-4 h-4 inline mr-1 text-gray-400" /> {b.dealer} 
+                          <span className="mx-2">|</span> 
+                          <span className="font-medium">รุ่น:</span> {b.model} <span className="mx-1"></span> 
+                          <span className="font-medium">สี:</span> {b.color}
+                        </p>
+                      </div>
+                      <div className="flex space-x-2 w-full md:w-auto mt-3 md:mt-0">
+                        <button 
+                          onClick={() => handleApproveCar(b.id)}
+                          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center transition-colors w-full md:w-auto justify-center"
+                        >
+                          <CheckCircle className="w-4 h-4 mr-1" /> อนุมัติ
+                        </button>
+                        <button 
+                          onClick={() => handleRejectCar(b.id)}
+                          className="bg-red-100 hover:bg-red-200 text-red-700 px-4 py-2 rounded-lg text-sm font-medium flex items-center transition-colors w-full md:w-auto justify-center"
+                        >
+                          <X className="w-4 h-4 mr-1" /> ปฏิเสธ
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200 text-center mt-8">
               <FileSpreadsheet className="w-16 h-16 text-emerald-500 mx-auto mb-4" />
               <h3 className="text-lg font-bold text-gray-800 mb-2">นำเข้าไฟล์ Excel รายชื่อผู้แทนจำหน่าย</h3>
               <p className="text-sm text-gray-600 mb-6 max-w-md mx-auto">
