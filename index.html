@@ -21,7 +21,7 @@
         "lucide-react": "https://esm.sh/lucide-react@0.292.0",
         "firebase/app": "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js",
         "firebase/auth": "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js",
-        "firebase/firestore": "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"
+        "firebase/database": "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js"
       }
     }
   </script>
@@ -45,7 +45,7 @@
     // --- Firebase SDK Imports ---
     import { initializeApp } from 'firebase/app';
     import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
-    import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
+    import { getDatabase, ref, set, update, remove, onValue, push } from 'firebase/database';
 
     // --- Firebase Configuration ---
     const userFirebaseConfig = {
@@ -62,8 +62,11 @@
     const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : userFirebaseConfig;
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
-    const db = getFirestore(app);
+    const database = getDatabase(app);
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'omoda-jaecoo-tracker';
+    
+    // แปลงตัวอักษรพิเศษที่ไม่รองรับใน Realtime Database ให้เป็น '_' เพื่อป้องกัน Error
+    const safeAppId = appId.replace(/[\.#$\[\]]/g, '_');
 
     const CAR_COLORS = ["White (ขาว)", "Black (ดำ)", "Grey (เทา)", "Green (เขียว)", "Silver (เงิน)"];
     const CAR_MODELS = ["OMODA C5 EV", "JAECOO 6", "JAECOO 7 PHEV", "JAECOO 8 PHEV"];
@@ -204,29 +207,32 @@
         return () => unsubscribe();
       }, []);
 
-      // --- Firebase Data Fetching ---
+      // --- Firebase Data Fetching (Realtime Database) ---
       useEffect(() => {
         if (!user) return;
 
-        const dealersDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'dealersList');
-        const inventoryRef = collection(db, 'artifacts', appId, 'public', 'data', 'inventory');
-        const bookingsRef = collection(db, 'artifacts', appId, 'public', 'data', 'bookings');
+        const dealersRef = ref(database, `artifacts/${safeAppId}/public/data/settings/dealersList`);
+        const inventoryRef = ref(database, `artifacts/${safeAppId}/public/data/inventory`);
+        const bookingsRef = ref(database, `artifacts/${safeAppId}/public/data/bookings`);
 
-        const unsubDealers = onSnapshot(dealersDocRef, (docSnap) => {
-          if (docSnap.exists()) {
-            setDealersData(docSnap.data().list || []);
-          } else {
-            setDealersData([]);
-          }
+        const unsubDealers = onValue(dealersRef, (snapshot) => {
+          const data = snapshot.val();
+          setDealersData(data?.list || []);
         }, (err) => console.error("Error fetching dealers:", err));
 
-        const unsubInventory = onSnapshot(inventoryRef, (snapshot) => {
-          const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        const unsubInventory = onValue(inventoryRef, (snapshot) => {
+          const data = [];
+          snapshot.forEach((childSnapshot) => {
+            data.push({ id: childSnapshot.key, ...childSnapshot.val() });
+          });
           setInventory(data);
         }, (err) => console.error("Error fetching inventory:", err));
 
-        const unsubBookings = onSnapshot(bookingsRef, (snapshot) => {
-          const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        const unsubBookings = onValue(bookingsRef, (snapshot) => {
+          const data = [];
+          snapshot.forEach((childSnapshot) => {
+            data.push({ id: childSnapshot.key, ...childSnapshot.val() });
+          });
           setBookings(data);
         }, (err) => console.error("Error fetching bookings:", err));
 
@@ -244,8 +250,8 @@
       const handleReceiveCar = async (bookingId) => {
         if (!user) return;
         try {
-          const bookingRef = doc(db, 'artifacts', appId, 'public', 'data', 'bookings', bookingId);
-          await setDoc(bookingRef, { status: 'delivered' }, { merge: true });
+          const bookingRef = ref(database, `artifacts/${safeAppId}/public/data/bookings/${bookingId}`);
+          await update(bookingRef, { status: 'delivered' });
         } catch (error) {
           console.error("Error updating status:", error);
         }
@@ -556,11 +562,12 @@
           try {
             const existing = inventory.find(item => item.dealer === selectedDealer && item.model === model && item.color === color);
             if (existing) {
-              const itemRef = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', existing.id);
-              await setDoc(itemRef, { ...existing, qty: existing.qty + qty });
+              const itemRef = ref(database, `artifacts/${safeAppId}/public/data/inventory/${existing.id}`);
+              await update(itemRef, { qty: existing.qty + qty });
             } else {
-              const newRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'inventory'));
-              await setDoc(newRef, { dealer: selectedDealer, model, color, qty });
+              const inventoryListRef = ref(database, `artifacts/${safeAppId}/public/data/inventory`);
+              const newRef = push(inventoryListRef);
+              await set(newRef, { dealer: selectedDealer, model, color, qty });
             }
             e.target.reset(); 
           } catch (error) {
@@ -579,11 +586,11 @@
           if (isNaN(newQty) || newQty < 0) return;
 
           try {
-            const itemRef = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', id);
+            const itemRef = ref(database, `artifacts/${safeAppId}/public/data/inventory/${id}`);
             if (newQty === 0) {
-              await deleteDoc(itemRef);
+              await remove(itemRef);
             } else {
-              await setDoc(itemRef, { qty: newQty }, { merge: true });
+              await update(itemRef, { qty: newQty });
             }
             setEditingItemId(null);
           } catch (error) {
@@ -595,7 +602,7 @@
           if (!user) return;
           showConfirm('คุณแน่ใจหรือไม่ว่าต้องการลบรายการสต็อกนี้?', async () => {
             try {
-              await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', id));
+              await remove(ref(database, `artifacts/${safeAppId}/public/data/inventory/${id}`));
             } catch (error) {
               console.error("Error deleting inventory:", error);
             }
@@ -824,8 +831,9 @@
           if (!customerName || !selectedDealer || !model || !color) return;
 
           try {
-            const newRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'bookings'));
-            await setDoc(newRef, {
+            const bookingsListRef = ref(database, `artifacts/${safeAppId}/public/data/bookings`);
+            const newRef = push(bookingsListRef);
+            await set(newRef, {
               customerName,
               province: selectedProvince,
               dealer: selectedDealer,
@@ -1063,8 +1071,8 @@
               }
 
               if (newData.length > 0) {
-                const dealersDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'dealersList');
-                await setDoc(dealersDocRef, { list: newData });
+                const dealersRef = ref(database, `artifacts/${safeAppId}/public/data/settings/dealersList`);
+                await set(dealersRef, { list: newData });
                 
                 showAlert(`✅ อัปโหลดและบันทึกลงฐานข้อมูลสำเร็จทั้งหมด ${newData.length} สาขา! ข้อมูลจะถูก Sync ไปยังทุกคนที่กำลังใช้งานระบบ`);
               } else {
